@@ -1,0 +1,6 @@
+[package]
+name = "sea"
+version = "0.1.0"
+authors = ["Rasmus Erik Voel Jensen <github-rasmuserik@solsort.dk>"]
+
+[dependencies]

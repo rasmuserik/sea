@@ -1,0 +1,27 @@
+{
+  "name": "sea",
+  "version": "0.1.0",
+  "description": "",
+  "main": "sea.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/solsort/sea.git"
+  },
+  "author": "RasmusErik Voel Jensen <npmjs@solsort.com>",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/solsort/sea/issues"
+  },
+  "homepage": "https://github.com/solsort/sea#readme",
+  "dependencies": {
+    "ws": "^2.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^3.17.1",
+    "live-server": "^1.2.0",
+    "uglify-js-harmony": "^2.7.5"
+  }
+}
