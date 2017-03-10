@@ -17,6 +17,17 @@
 
     <hr>
 
+    <script>
+(async function() {
+var code = await fetch('sea.wasm');
+code = await code.arrayBuffer()
+window.Module = {'wasmBinary': code};
+
+script = document.createElement('script');
+script.src = 'target/wasm32-unknown-emscripten/debug/sea.js';
+document.body.appendChild(script);
+})()
+    </script>
     <script src=sea.js></script>
     <script>document.write('<script src="//incoming.solsort.com/log.js?' + location.protocol + '//' + location.host + location.pathname + location.search + '"></s' + 'cript>');</script>
   </body>
