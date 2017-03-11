@@ -4,3 +4,6 @@ version = "0.1.0"
 authors = ["Rasmus Erik Voel Jensen <github-rasmuserik@solsort.dk>"]
 
 [dependencies]
+
+# extprim(i128) does not work on emscripten yet, - would have been nice though:
+# extprim = "1.2.1"
