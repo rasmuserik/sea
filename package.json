@@ -24,6 +24,7 @@
   "devDependencies": {
     "eslint": "^3.17.1",
     "live-server": "^1.2.0",
-    "uglify-js-harmony": "^2.7.5"
+    "uglify-js-harmony": "^2.7.5",
+    "watchify": "^3.9.0"
   }
 }
