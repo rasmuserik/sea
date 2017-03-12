@@ -11,12 +11,13 @@
     "url": "git+https://github.com/solsort/sea.git"
   },
   "author": "RasmusErik Voel Jensen <npmjs@solsort.com>",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/solsort/sea/issues"
   },
   "homepage": "https://github.com/solsort/sea#readme",
   "dependencies": {
+    "cbor-js": "^0.1.0",
     "electron": "^1.6.3",
     "ws": "^2.2.0"
   },
