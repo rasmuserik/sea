@@ -17,31 +17,28 @@ ipfs object get Qma2b6kw5BgyqqSxYmsMryRAusykBgHStRTVte7UCvc3Yp
 {"Links":[],"Data":"\u0008\u0002\u0012\n{\"a\":\"b\"}\n\u0018\n"}
 */
 var multihash = 'QmYCvbfNbCwFR45HiNP45rwJgvatpiW38D961L5qAhUM5Y'
-json = {"Links":[],"Data":"\u0008\u0002\u0012\ufffd\u0001Come hang out in our IRC chat room if you have any questions.\n\nContact the ipfs dev team:\n- Bugs: https://github.com/ipfs/go-ipfs/issues\n- Help: irc.freenode.org/#ipfs\n- Email: dev@ipfs.io\n\u0018\ufffd\u0001"}
-//json = {"Links":[],"Data":"\u0008\u0002\u0012\n{\"a\":\"b\"}\n\u0018\n"};
+//json = {"Links":[],"Data":"\u0008\u0002\u0012\ufffd\u0001Come hang out in our IRC chat room if you have any questions.\n\nContact the ipfs dev team:\n- Bugs: https://github.com/ipfs/go-ipfs/issues\n- Help: irc.freenode.org/#ipfs\n- Email: dev@ipfs.io\n\u0018\ufffd\u0001"}
+json = { 
+  "Data":"", 
+  "Links":[],
+};
 var cbor = CBOR.encode(json)
-s = "\u0008\u0002\u0012\n{\"a\":\"b\"}\n\u0018\n"
-var t = new Uint8Array(s.length);
-for(var i = 0; i < s.length; ++i) {
-  t[i] = s.charCodeAt(i);
+var ua = Array.from(new Uint8Array(cbor));
+console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+var data = cbor;
+str = 'multihash';
+data = new Uint8Array(str.length);
+for(var i = 0; i < str.length; ++i) {
+  data[i] = str.charCodeAt(i);
 }
-var hash = await crypto.subtle.digest('SHA-256', t);
+var hash = await crypto.subtle.digest('SHA-256', data);
 console.log('hash', hash, hash.byteLength);
 var ta = new Uint8Array(34);
 ta[0] = 0x12;
 ta[1] = 0x20;
 ta.set(new Uint8Array(hash), 2);
-s = atob('EiCcvAfD+ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy+Rw');
-/*
-for(var i = 0; i < 34; ++i) {
-ta[i] = s.charCodeAt(i);
-}
-*/
-//ta = Uint8Array.from(s);
-console.log(s.length);
-console.log('12209cbc07c3f991725836a3aa2a581ca2029198aa420b9d99bc0e131d9f3e2cbe47'.length);
-ta.set(hash, 2);
 console.log(ta, Base58.encode(ta), hash);
 })();
+console.log('heloo');
 </script>
 </body></html>
