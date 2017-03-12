@@ -1,6 +1,6 @@
+// # Sea.js
+//
 (async function() {
-
-
 
   var key = await crypto.subtle.generateKey({
     name: 'ECDSA', 
@@ -8,9 +8,6 @@
   }, true, ['sign', 'verify']);
   var publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
   var id = await crypto.subtle.digest('SHA-256', publicKey);
-
-  console.log('pubkey', id, id.byteLength);
-
 
   if(typeof process === 'object'  // isNode
       && process.versions 
@@ -53,6 +50,22 @@
   }
 
   async function browserMain() {
+    var ws = new WebSocket('ws://localhost:8888/');
+    ws.addEventListener('message', (msg) => {
+      console.log('message', msg);
+    });
+    ws.addEventListener('open', (msg) => {
+      ws.send(JSON.stringify({type: 'helo', data: 'me'}));
+      console.log('open', msg);
+    });
+    ws.addEventListener('close', (msg) => {
+      console.log('close', msg);
+    });
+    ws.addEventListener('error', (msg) => {
+      console.log('error', msg);
+    });
+  }
+  async function browserMainX() {
     console.log('browser');
     var id;
     var peerIds;

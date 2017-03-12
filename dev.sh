@@ -8,7 +8,9 @@ while inotifywait -e modify,close_write,move_self -q *.js
 do 
   kill `cat .pid`
   sleep 0.1
-  DIREAPE_DEV=true node sea.js test server $@ &
+# DIREAPE_DEV=true node sea.js test server $@ &
+  ./node_modules/.bin/electron .
+
   echo $! > .pid
   sleep 3
 done
