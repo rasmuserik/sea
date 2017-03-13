@@ -12,12 +12,8 @@
 <script src=https://unpkg.com/base-58></script>
 <script>
 (async () => {
-/*
-ipfs object get Qma2b6kw5BgyqqSxYmsMryRAusykBgHStRTVte7UCvc3Yp                           
-{"Links":[],"Data":"\u0008\u0002\u0012\n{\"a\":\"b\"}\n\u0018\n"}
-*/
-var multihash = 'QmYCvbfNbCwFR45HiNP45rwJgvatpiW38D961L5qAhUM5Y'
-//json = {"Links":[],"Data":"\u0008\u0002\u0012\ufffd\u0001Come hang out in our IRC chat room if you have any questions.\n\nContact the ipfs dev team:\n- Bugs: https://github.com/ipfs/go-ipfs/issues\n- Help: irc.freenode.org/#ipfs\n- Email: dev@ipfs.io\n\u0018\ufffd\u0001"}
+
+// QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
 json = { 
   "Data":"", 
   "Links":[],
@@ -25,12 +21,13 @@ json = {
 var cbor = CBOR.encode(json)
 var ua = Array.from(new Uint8Array(cbor));
 console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
-var data = cbor;
-str = 'multihash';
-data = new Uint8Array(str.length);
-for(var i = 0; i < str.length; ++i) {
-  data[i] = str.charCodeAt(i);
-}
+var d1 = new Uint8Array(cbor.byteLength + 1);
+console.log(d1, cbor);
+d1[0] = 0x51;
+d1.set(new Uint8Array(cbor), 1);
+data = d1;
+var ua = Array.from(new Uint8Array(data));
+console.log('x', data.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
 var hash = await crypto.subtle.digest('SHA-256', data);
 console.log('hash', hash, hash.byteLength);
 var ta = new Uint8Array(34);
