@@ -8,7 +8,7 @@
     "build": "webpack",
     "autobuild": "webpack --watch",
     "electron": "ELECTRON_ENABLE_LOGGING=1 electron ./electron/",
-    "liveserver": "live-server --no-browser --ignore=node_modules --ignore=lib",
+    "liveserver": "live-server --ignore=node_modules --ignore=lib",
     "dev": "webpack --watch & npm run liveserver & sh electron/dev-linux.sh; killall node electron",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
