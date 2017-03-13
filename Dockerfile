@@ -2,6 +2,6 @@ FROM node:latest
 
 COPY . /app
 WORKDIR /app
-RUN apt-get install xz-utils
-ENTRYPOINT ["node", "incoming.js"]
+RUN npm install
+ENTRYPOINT ["npm", "run", "electron"]
 EXPOSE 8888

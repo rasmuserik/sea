@@ -2,14 +2,14 @@
   "name": "sea",
   "version": "0.0.1",
   "description": "",
-  "main": "sea.js",
-  "browser": "bundle.js",
+  "main": "lib/sea.js",
+  "browser": "dist.js",
   "scripts": {
     "build": "webpack",
     "autobuild": "webpack --watch",
-    "electron": "electron electron",
-    "liveserver": "live-server --no-browser --ignore=node_modules --ignore=sea.js &",
-    "dev": "killall node; npm run liveserver ; npm run autobuild",
+    "electron": "ELECTRON_ENABLE_LOGGING=1 electron ./electron/",
+    "liveserver": "live-server --no-browser --ignore=node_modules --ignore=lib",
+    "dev": "webpack --watch & npm run liveserver & sh electron/dev-linux.sh; killall node electron",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

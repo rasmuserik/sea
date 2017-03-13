@@ -1,6 +1,6 @@
 module.exports = {
-  entry: './sea.js',
+  entry: './lib/sea.js',
   output: {
-    filename: 'bundle.js'
+    filename: 'dist.js'
   }
 }

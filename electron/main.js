@@ -5,7 +5,8 @@ const url = require('url');
 let w;
 app.on('ready', function() {
     w = new BrowserWindow({
-      "webPreferences": {"webSecurity": false}
+      'show': false,
+      'webPreferences': {'webSecurity': false}
     });
 
     w.loadURL(url.format({
