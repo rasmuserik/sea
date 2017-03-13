@@ -9,7 +9,7 @@ app.on('ready', function() {
     });
 
     w.loadURL(url.format({
-        pathname: path.join(__dirname, 'electron.html'),
+        pathname: path.join(__dirname, 'main.html'),
         protocol: 'file:',
         slashes: true
     }));

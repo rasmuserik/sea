@@ -1,11 +1,15 @@
 {
   "name": "sea",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "",
-  "main": "electron.js",
+  "main": "sea.js",
+  "browser": "bundle.js",
   "scripts": {
-    "electron": "./node_modules/.bin/electron electron",
-    "webpack": "./node_modules/.bin/webpack",
+    "build": "webpack",
+    "autobuild": "webpack --watch",
+    "electron": "electron electron",
+    "liveserver": "live-server --no-browser --ignore=node_modules --ignore=sea.js &",
+    "dev": "killall node; npm run liveserver ; npm run autobuild",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -17,14 +21,14 @@
   "bugs": {
     "url": "https://github.com/solsort/sea/issues"
   },
-  "homepage": "https://github.com/solsort/sea#readme",
+  "homepage": "https://sea.solsort.com/",
   "dependencies": {
     "cbor-js": "^0.1.0",
-    "electron": "^1.6.3",
     "wolfy87-eventemitter": "^5.1.0",
     "ws": "^2.2.0"
   },
   "devDependencies": {
+    "electron": "^1.6.3",
     "live-server": "^1.2.0",
     "webpack": "^2.2.1"
   }

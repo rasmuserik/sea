@@ -1,5 +1,4 @@
-(async function() {
-
+self.WebSocketServer = async () => {
   var sea = require('./sea');
 
   var server = require('http').createServer();
@@ -26,4 +25,4 @@
   server.listen(8888, () => {
     console.log('started on', server.address().port);
   });
-})();
+}

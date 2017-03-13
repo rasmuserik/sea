@@ -1,6 +1,8 @@
 // # Sea.js
 //
+console.log('hello');
 (async function() {
+  require('cbor-js');
 
   var key = await crypto.subtle.generateKey({
     name: 'ECDSA', 
@@ -140,3 +142,28 @@
     }
   }
 })();
+(async () => {
+
+// QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
+json = { 
+  "Data":"", 
+  "Links":[],
+};
+var cbor = CBOR.encode(json)
+var ua = Array.from(new Uint8Array(cbor));
+console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+var d1 = new Uint8Array(cbor.byteLength + 1);
+console.log(d1, cbor);
+d1[0] = 0x51;
+d1.set(new Uint8Array(cbor), 1);
+data = d1;
+var ua = Array.from(new Uint8Array(data));
+console.log('x', data.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+var hash = await crypto.subtle.digest('SHA-256', data);
+console.log('hash', hash, hash.byteLength);
+var ta = new Uint8Array(34);
+ta[0] = 0x12;
+ta[1] = 0x20;
+ta.set(new Uint8Array(hash), 2);
+console.log(ta, Base58.encode(ta), hash);
+})
