@@ -1,4 +1,3 @@
 node_modules/
 .pid*
-target/
-sea.wasm
+index.js
