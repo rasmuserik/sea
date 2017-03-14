@@ -63,441 +63,431 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 2);
+/******/ 	return __webpack_require__(__webpack_require__.s = 1);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ (function(module, exports) {
 
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
- * The MIT License (MIT)
- *
- * Copyright (c) 2014 Patrick Gansterer <paroga@paroga.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-(function(global, undefined) { "use strict";
-var POW_2_24 = Math.pow(2, -24),
-    POW_2_32 = Math.pow(2, 32),
-    POW_2_53 = Math.pow(2, 53);
-
-function encode(value) {
-  var data = new ArrayBuffer(256);
-  var dataView = new DataView(data);
-  var lastLength;
-  var offset = 0;
-
-  function ensureSpace(length) {
-    var newByteLength = data.byteLength;
-    var requiredLength = offset + length;
-    while (newByteLength < requiredLength)
-      newByteLength *= 2;
-    if (newByteLength !== data.byteLength) {
-      var oldDataView = dataView;
-      data = new ArrayBuffer(newByteLength);
-      dataView = new DataView(data);
-      var uint32count = (offset + 3) >> 2;
-      for (var i = 0; i < uint32count; ++i)
-        dataView.setUint32(i * 4, oldDataView.getUint32(i * 4));
-    }
-
-    lastLength = length;
-    return dataView;
-  }
-  function write() {
-    offset += lastLength;
-  }
-  function writeFloat64(value) {
-    write(ensureSpace(8).setFloat64(offset, value));
-  }
-  function writeUint8(value) {
-    write(ensureSpace(1).setUint8(offset, value));
-  }
-  function writeUint8Array(value) {
-    var dataView = ensureSpace(value.length);
-    for (var i = 0; i < value.length; ++i)
-      dataView.setUint8(offset + i, value[i]);
-    write();
-  }
-  function writeUint16(value) {
-    write(ensureSpace(2).setUint16(offset, value));
-  }
-  function writeUint32(value) {
-    write(ensureSpace(4).setUint32(offset, value));
-  }
-  function writeUint64(value) {
-    var low = value % POW_2_32;
-    var high = (value - low) / POW_2_32;
-    var dataView = ensureSpace(8);
-    dataView.setUint32(offset, high);
-    dataView.setUint32(offset + 4, low);
-    write();
-  }
-  function writeTypeAndLength(type, length) {
-    if (length < 24) {
-      writeUint8(type << 5 | length);
-    } else if (length < 0x100) {
-      writeUint8(type << 5 | 24);
-      writeUint8(length);
-    } else if (length < 0x10000) {
-      writeUint8(type << 5 | 25);
-      writeUint16(length);
-    } else if (length < 0x100000000) {
-      writeUint8(type << 5 | 26);
-      writeUint32(length);
-    } else {
-      writeUint8(type << 5 | 27);
-      writeUint64(length);
-    }
-  }
-  
-  function encodeItem(value) {
-    var i;
-
-    if (value === false)
-      return writeUint8(0xf4);
-    if (value === true)
-      return writeUint8(0xf5);
-    if (value === null)
-      return writeUint8(0xf6);
-    if (value === undefined)
-      return writeUint8(0xf7);
-  
-    switch (typeof value) {
-      case "number":
-        if (Math.floor(value) === value) {
-          if (0 <= value && value <= POW_2_53)
-            return writeTypeAndLength(0, value);
-          if (-POW_2_53 <= value && value < 0)
-            return writeTypeAndLength(1, -(value + 1));
-        }
-        writeUint8(0xfb);
-        return writeFloat64(value);
-
-      case "string":
-        var utf8data = [];
-        for (i = 0; i < value.length; ++i) {
-          var charCode = value.charCodeAt(i);
-          if (charCode < 0x80) {
-            utf8data.push(charCode);
-          } else if (charCode < 0x800) {
-            utf8data.push(0xc0 | charCode >> 6);
-            utf8data.push(0x80 | charCode & 0x3f);
-          } else if (charCode < 0xd800) {
-            utf8data.push(0xe0 | charCode >> 12);
-            utf8data.push(0x80 | (charCode >> 6)  & 0x3f);
-            utf8data.push(0x80 | charCode & 0x3f);
-          } else {
-            charCode = (charCode & 0x3ff) << 10;
-            charCode |= value.charCodeAt(++i) & 0x3ff;
-            charCode += 0x10000;
-
-            utf8data.push(0xf0 | charCode >> 18);
-            utf8data.push(0x80 | (charCode >> 12)  & 0x3f);
-            utf8data.push(0x80 | (charCode >> 6)  & 0x3f);
-            utf8data.push(0x80 | charCode & 0x3f);
-          }
-        }
-
-        writeTypeAndLength(3, utf8data.length);
-        return writeUint8Array(utf8data);
-
-      default:
-        var length;
-        if (Array.isArray(value)) {
-          length = value.length;
-          writeTypeAndLength(4, length);
-          for (i = 0; i < length; ++i)
-            encodeItem(value[i]);
-        } else if (value instanceof Uint8Array) {
-          writeTypeAndLength(2, value.length);
-          writeUint8Array(value);
-        } else {
-          var keys = Object.keys(value);
-          length = keys.length;
-          writeTypeAndLength(5, length);
-          for (i = 0; i < length; ++i) {
-            var key = keys[i];
-            encodeItem(key);
-            encodeItem(value[key]);
-          }
-        }
-    }
-  }
-  
-  encodeItem(value);
-
-  if ("slice" in data)
-    return data.slice(0, offset);
-  
-  var ret = new ArrayBuffer(offset);
-  var retView = new DataView(ret);
-  for (var i = 0; i < offset; ++i)
-    retView.setUint8(i, dataView.getUint8(i));
-  return ret;
+function EventEmitter() {
+  this._events = this._events || {};
+  this._maxListeners = this._maxListeners || undefined;
 }
+module.exports = EventEmitter;
 
-function decode(data, tagger, simpleValue) {
-  var dataView = new DataView(data);
-  var offset = 0;
-  
-  if (typeof tagger !== "function")
-    tagger = function(value) { return value; };
-  if (typeof simpleValue !== "function")
-    simpleValue = function() { return undefined; };
+// Backwards-compat with node 0.10.x
+EventEmitter.EventEmitter = EventEmitter;
 
-  function read(value, length) {
-    offset += length;
-    return value;
-  }
-  function readArrayBuffer(length) {
-    return read(new Uint8Array(data, offset, length), length);
-  }
-  function readFloat16() {
-    var tempArrayBuffer = new ArrayBuffer(4);
-    var tempDataView = new DataView(tempArrayBuffer);
-    var value = readUint16();
+EventEmitter.prototype._events = undefined;
+EventEmitter.prototype._maxListeners = undefined;
 
-    var sign = value & 0x8000;
-    var exponent = value & 0x7c00;
-    var fraction = value & 0x03ff;
-    
-    if (exponent === 0x7c00)
-      exponent = 0xff << 10;
-    else if (exponent !== 0)
-      exponent += (127 - 15) << 10;
-    else if (fraction !== 0)
-      return fraction * POW_2_24;
-    
-    tempDataView.setUint32(0, sign << 16 | exponent << 13 | fraction << 13);
-    return tempDataView.getFloat32(0);
-  }
-  function readFloat32() {
-    return read(dataView.getFloat32(offset), 4);
-  }
-  function readFloat64() {
-    return read(dataView.getFloat64(offset), 8);
-  }
-  function readUint8() {
-    return read(dataView.getUint8(offset), 1);
-  }
-  function readUint16() {
-    return read(dataView.getUint16(offset), 2);
-  }
-  function readUint32() {
-    return read(dataView.getUint32(offset), 4);
-  }
-  function readUint64() {
-    return readUint32() * POW_2_32 + readUint32();
-  }
-  function readBreak() {
-    if (dataView.getUint8(offset) !== 0xff)
-      return false;
-    offset += 1;
-    return true;
-  }
-  function readLength(additionalInformation) {
-    if (additionalInformation < 24)
-      return additionalInformation;
-    if (additionalInformation === 24)
-      return readUint8();
-    if (additionalInformation === 25)
-      return readUint16();
-    if (additionalInformation === 26)
-      return readUint32();
-    if (additionalInformation === 27)
-      return readUint64();
-    if (additionalInformation === 31)
-      return -1;
-    throw "Invalid length encoding";
-  }
-  function readIndefiniteStringLength(majorType) {
-    var initialByte = readUint8();
-    if (initialByte === 0xff)
-      return -1;
-    var length = readLength(initialByte & 0x1f);
-    if (length < 0 || (initialByte >> 5) !== majorType)
-      throw "Invalid indefinite length element";
-    return length;
-  }
+// By default EventEmitters will print a warning if more than 10 listeners are
+// added to it. This is a useful default which helps finding memory leaks.
+EventEmitter.defaultMaxListeners = 10;
 
-  function appendUtf16data(utf16data, length) {
-    for (var i = 0; i < length; ++i) {
-      var value = readUint8();
-      if (value & 0x80) {
-        if (value < 0xe0) {
-          value = (value & 0x1f) <<  6
-                | (readUint8() & 0x3f);
-          length -= 1;
-        } else if (value < 0xf0) {
-          value = (value & 0x0f) << 12
-                | (readUint8() & 0x3f) << 6
-                | (readUint8() & 0x3f);
-          length -= 2;
-        } else {
-          value = (value & 0x0f) << 18
-                | (readUint8() & 0x3f) << 12
-                | (readUint8() & 0x3f) << 6
-                | (readUint8() & 0x3f);
-          length -= 3;
-        }
-      }
+// Obviously not all Emitters should be limited to 10. This function allows
+// that to be increased. Set to zero for unlimited.
+EventEmitter.prototype.setMaxListeners = function(n) {
+  if (!isNumber(n) || n < 0 || isNaN(n))
+    throw TypeError('n must be a positive number');
+  this._maxListeners = n;
+  return this;
+};
 
-      if (value < 0x10000) {
-        utf16data.push(value);
+EventEmitter.prototype.emit = function(type) {
+  var er, handler, len, args, i, listeners;
+
+  if (!this._events)
+    this._events = {};
+
+  // If there is no 'error' event listener then throw.
+  if (type === 'error') {
+    if (!this._events.error ||
+        (isObject(this._events.error) && !this._events.error.length)) {
+      er = arguments[1];
+      if (er instanceof Error) {
+        throw er; // Unhandled 'error' event
       } else {
-        value -= 0x10000;
-        utf16data.push(0xd800 | (value >> 10));
-        utf16data.push(0xdc00 | (value & 0x3ff));
+        // At least give some kind of context to the user
+        var err = new Error('Uncaught, unspecified "error" event. (' + er + ')');
+        err.context = er;
+        throw err;
       }
     }
   }
 
-  function decodeItem() {
-    var initialByte = readUint8();
-    var majorType = initialByte >> 5;
-    var additionalInformation = initialByte & 0x1f;
-    var i;
-    var length;
+  handler = this._events[type];
 
-    if (majorType === 7) {
-      switch (additionalInformation) {
-        case 25:
-          return readFloat16();
-        case 26:
-          return readFloat32();
-        case 27:
-          return readFloat64();
-      }
-    }
+  if (isUndefined(handler))
+    return false;
 
-    length = readLength(additionalInformation);
-    if (length < 0 && (majorType < 2 || 6 < majorType))
-      throw "Invalid length";
-
-    switch (majorType) {
-      case 0:
-        return length;
+  if (isFunction(handler)) {
+    switch (arguments.length) {
+      // fast cases
       case 1:
-        return -1 - length;
+        handler.call(this);
+        break;
       case 2:
-        if (length < 0) {
-          var elements = [];
-          var fullArrayLength = 0;
-          while ((length = readIndefiniteStringLength(majorType)) >= 0) {
-            fullArrayLength += length;
-            elements.push(readArrayBuffer(length));
-          }
-          var fullArray = new Uint8Array(fullArrayLength);
-          var fullArrayOffset = 0;
-          for (i = 0; i < elements.length; ++i) {
-            fullArray.set(elements[i], fullArrayOffset);
-            fullArrayOffset += elements[i].length;
-          }
-          return fullArray;
-        }
-        return readArrayBuffer(length);
+        handler.call(this, arguments[1]);
+        break;
       case 3:
-        var utf16data = [];
-        if (length < 0) {
-          while ((length = readIndefiniteStringLength(majorType)) >= 0)
-            appendUtf16data(utf16data, length);
-        } else
-          appendUtf16data(utf16data, length);
-        return String.fromCharCode.apply(null, utf16data);
-      case 4:
-        var retArray;
-        if (length < 0) {
-          retArray = [];
-          while (!readBreak())
-            retArray.push(decodeItem());
-        } else {
-          retArray = new Array(length);
-          for (i = 0; i < length; ++i)
-            retArray[i] = decodeItem();
-        }
-        return retArray;
-      case 5:
-        var retObject = {};
-        for (i = 0; i < length || length < 0 && !readBreak(); ++i) {
-          var key = decodeItem();
-          retObject[key] = decodeItem();
-        }
-        return retObject;
-      case 6:
-        return tagger(decodeItem(), length);
-      case 7:
-        switch (length) {
-          case 20:
-            return false;
-          case 21:
-            return true;
-          case 22:
-            return null;
-          case 23:
-            return undefined;
-          default:
-            return simpleValue(length);
-        }
+        handler.call(this, arguments[1], arguments[2]);
+        break;
+      // slower
+      default:
+        args = Array.prototype.slice.call(arguments, 1);
+        handler.apply(this, args);
+    }
+  } else if (isObject(handler)) {
+    args = Array.prototype.slice.call(arguments, 1);
+    listeners = handler.slice();
+    len = listeners.length;
+    for (i = 0; i < len; i++)
+      listeners[i].apply(this, args);
+  }
+
+  return true;
+};
+
+EventEmitter.prototype.addListener = function(type, listener) {
+  var m;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events)
+    this._events = {};
+
+  // To avoid recursion in the case that type === "newListener"! Before
+  // adding it to the listeners, first emit "newListener".
+  if (this._events.newListener)
+    this.emit('newListener', type,
+              isFunction(listener.listener) ?
+              listener.listener : listener);
+
+  if (!this._events[type])
+    // Optimize the case of one listener. Don't need the extra array object.
+    this._events[type] = listener;
+  else if (isObject(this._events[type]))
+    // If we've already got an array, just append.
+    this._events[type].push(listener);
+  else
+    // Adding the second element, need to change to array.
+    this._events[type] = [this._events[type], listener];
+
+  // Check for listener leak
+  if (isObject(this._events[type]) && !this._events[type].warned) {
+    if (!isUndefined(this._maxListeners)) {
+      m = this._maxListeners;
+    } else {
+      m = EventEmitter.defaultMaxListeners;
+    }
+
+    if (m && m > 0 && this._events[type].length > m) {
+      this._events[type].warned = true;
+      console.error('(node) warning: possible EventEmitter memory ' +
+                    'leak detected. %d listeners added. ' +
+                    'Use emitter.setMaxListeners() to increase limit.',
+                    this._events[type].length);
+      if (typeof console.trace === 'function') {
+        // not supported in IE 10
+        console.trace();
+      }
     }
   }
 
-  var ret = decodeItem();
-  if (offset !== data.byteLength)
-    throw "Remaining bytes";
+  return this;
+};
+
+EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+
+EventEmitter.prototype.once = function(type, listener) {
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  var fired = false;
+
+  function g() {
+    this.removeListener(type, g);
+
+    if (!fired) {
+      fired = true;
+      listener.apply(this, arguments);
+    }
+  }
+
+  g.listener = listener;
+  this.on(type, g);
+
+  return this;
+};
+
+// emits a 'removeListener' event iff the listener was removed
+EventEmitter.prototype.removeListener = function(type, listener) {
+  var list, position, length, i;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events || !this._events[type])
+    return this;
+
+  list = this._events[type];
+  length = list.length;
+  position = -1;
+
+  if (list === listener ||
+      (isFunction(list.listener) && list.listener === listener)) {
+    delete this._events[type];
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+
+  } else if (isObject(list)) {
+    for (i = length; i-- > 0;) {
+      if (list[i] === listener ||
+          (list[i].listener && list[i].listener === listener)) {
+        position = i;
+        break;
+      }
+    }
+
+    if (position < 0)
+      return this;
+
+    if (list.length === 1) {
+      list.length = 0;
+      delete this._events[type];
+    } else {
+      list.splice(position, 1);
+    }
+
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.removeAllListeners = function(type) {
+  var key, listeners;
+
+  if (!this._events)
+    return this;
+
+  // not listening for removeListener, no need to emit
+  if (!this._events.removeListener) {
+    if (arguments.length === 0)
+      this._events = {};
+    else if (this._events[type])
+      delete this._events[type];
+    return this;
+  }
+
+  // emit removeListener for all listeners on all events
+  if (arguments.length === 0) {
+    for (key in this._events) {
+      if (key === 'removeListener') continue;
+      this.removeAllListeners(key);
+    }
+    this.removeAllListeners('removeListener');
+    this._events = {};
+    return this;
+  }
+
+  listeners = this._events[type];
+
+  if (isFunction(listeners)) {
+    this.removeListener(type, listeners);
+  } else if (listeners) {
+    // LIFO order
+    while (listeners.length)
+      this.removeListener(type, listeners[listeners.length - 1]);
+  }
+  delete this._events[type];
+
+  return this;
+};
+
+EventEmitter.prototype.listeners = function(type) {
+  var ret;
+  if (!this._events || !this._events[type])
+    ret = [];
+  else if (isFunction(this._events[type]))
+    ret = [this._events[type]];
+  else
+    ret = this._events[type].slice();
   return ret;
+};
+
+EventEmitter.prototype.listenerCount = function(type) {
+  if (this._events) {
+    var evlistener = this._events[type];
+
+    if (isFunction(evlistener))
+      return 1;
+    else if (evlistener)
+      return evlistener.length;
+  }
+  return 0;
+};
+
+EventEmitter.listenerCount = function(emitter, type) {
+  return emitter.listenerCount(type);
+};
+
+function isFunction(arg) {
+  return typeof arg === 'function';
 }
 
-var obj = { encode: encode, decode: decode };
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
 
-if (true)
-  !(__WEBPACK_AMD_DEFINE_FACTORY__ = (obj),
-				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
-				__WEBPACK_AMD_DEFINE_FACTORY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-else if (typeof module !== 'undefined' && module.exports)
-  module.exports = obj;
-else if (!global.CBOR)
-  global.CBOR = obj;
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
 
-})(this);
+function isUndefined(arg) {
+  return arg === void 0;
+}
 
 
 /***/ }),
-/* 1 */,
-/* 2 */
+/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // # Sea.js
-//
-(async function() {
-  var cbor = __webpack_require__(0);
+let EventEmitter = __webpack_require__(0);
+let bion= __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module \"bion\""); e.code = 'MODULE_NOT_FOUND';; throw e; }()));
+let sea = new EventEmitter();
+let publicKey;
+module.exports = sea;
 
-  var key = await crypto.subtle.generateKey({
+sea.on('connect:socket', (con) => {
+  con.on('message', (msg) => console.log('message', msg));
+  con.send({
+    type: 'helo',
+    id: sea.id
+  });
+  console.log('connect:socket', con);
+});
+
+main();
+
+async function main() { // ##
+  await generateId();
+  if(self.node_modules) {
+    startWsServer();
+  } else {
+    let connected = false;
+    while(!connected) {
+      try {
+        await connectToWs('ws://localhost:8888/');
+        connected = true;
+      } catch(e) {
+        console.log('error', e);
+        await sleep(1000);
+      }
+    }
+  }
+}
+
+async function generateId() { // ##
+  let key = await crypto.subtle.generateKey({
     name: 'ECDSA', 
     namedCurve: 'P-521'
   }, true, ['sign', 'verify']);
-  var publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
-  var id = await crypto.subtle.digest('SHA-256', publicKey);
+  publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
+  sea.id = new Uint8Array(await crypto.subtle.digest('SHA-256', publicKey));
+  sea.emit('ready');
+}
+
+function connectToWs(host) { // ##
+  return new Promise((resolve, reject) => {
+    let ws = new WebSocket(host);
+    let con = new EventEmitter();
+    con.send = (o) => ws.send(encode(o));
+    con.close = () => ws.close();
+    ws.addEventListener('message', (msg) => {
+      console.log('msg',msg);
+      con.emit('message', decode(msg.data));
+    });
+    ws.addEventListener('open', (msg) => {
+      sea.emit('connect:socket', con);
+      resolve();
+    });
+    ws.addEventListener('close', (msg) => {
+      con.emit('close');
+    });
+    ws.addEventListener('error', (msg) => {
+      reject(msg);
+    });
+  });
+}
+
+function startWsServer() { // ##
+  let server = node_modules.http.createServer();
+  let  wss = new node_modules.ws.Server({server: server});
+
+  let sockets = {};
+  wss.on('connection', (ws) => {
+    let con = new EventEmitter();
+    con.send = (o) => ws.send(encode(o));
+    con.close = (o) => ws.close();
+
+    sea.emit('connect:socket', con);
+    ws.on('message', (msg) => {
+      con.emit('message', decode(msg));
+    });
+  });
+
+  server.listen(8888, () => {
+    console.log('Started websocket server on port: ' + server.address().port);
+  });
+}
+
+// ## Utility functions
+function encode(obj) { // ###
+  bion.encode(obj);
+}
+
+function decode(obj) { // ###
+  if(typeof obj === 'string') {
+    return JSON.parse(obj);
+  } else {
+    return bion.decode(obj);
+  }
+}
+
+function sleep(ms) {// ###
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// # Old
+(async function() {
+
 
   if(self.node_modules) {
   } else { // isBrowser
@@ -627,60 +617,35 @@ else if (!global.CBOR)
       }
     }
   }
-})();
+});
 (async () => {
 
-// QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
-json = { 
-  "Data":"", 
-  "Links":[],
-};
-var cbor = CBOR.encode(json)
-var ua = Array.from(new Uint8Array(cbor));
-console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
-var d1 = new Uint8Array(cbor.byteLength + 1);
-console.log(d1, cbor);
-d1[0] = 0x51;
-d1.set(new Uint8Array(cbor), 1);
-data = d1;
-var ua = Array.from(new Uint8Array(data));
-console.log('x', data.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
-var hash = await crypto.subtle.digest('SHA-256', data);
-console.log('hash', hash, hash.byteLength);
-var ta = new Uint8Array(34);
-ta[0] = 0x12;
-ta[1] = 0x20;
-ta.set(new Uint8Array(hash), 2);
-console.log(ta, Base58.encode(ta), hash);
+  var CBOR;
+  // QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
+  json = { 
+    "Data":"", 
+    "Links":[],
+  };
+  var cbor = CBOR.encode(json)
+    var ua = Array.from(new Uint8Array(cbor));
+  console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+  var d1 = new Uint8Array(cbor.byteLength + 1);
+  console.log(d1, cbor);
+  d1[0] = 0x51;
+  d1.set(new Uint8Array(cbor), 1);
+  data = d1;
+  var ua = Array.from(new Uint8Array(data));
+  console.log('x', data.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+  var hash = await crypto.subtle.digest('SHA-256', data);
+  console.log('hash', hash, hash.byteLength);
+  var ta = new Uint8Array(34);
+  ta[0] = 0x12;
+  ta[1] = 0x20;
+  ta.set(new Uint8Array(hash), 2);
+  console.log(ta, Base58.encode(ta), hash);
 })
-
-if(self.node_modules) {
-  var server = node_modules.http.createServer();
-  var wss = new node_modules.ws.Server({server: server});
-
-  var sockets = {};
-  wss.on('connection', (ws) => {
-    var id = Math.random().toString(36).slice(2,12);
-    ws.send(JSON.stringify({
-      mbox: 'welcome',
-      id: id,
-      peers: Object.keys(sockets)
-    }));
-    sockets[id] = ws;
-    ws.on('message', (msg) => {
-      var o = JSON.parse(msg);
-      if(sockets[o.dst]) {
-        sockets[o.dst].send(msg);
-      } 
-      console.log(msg);
-    });
-  });
-
-  server.listen(8888, () => {
-    console.log('started on port ' + server.address().port);
-  });
-}
 
 
 /***/ })
 /******/ ]);
+//# sourceMappingURL=dist.js.map

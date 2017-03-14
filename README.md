@@ -1,70 +1,71 @@
-See <https://sea.solsort.com> for details
+# Sea
 
-# Dev environment
+The intention of sea is to be a core for building distributed web applications.
+The goal of Sea is become the distributed computing platform, running peer-to-peer in the webbrowser. 
 
-https://github.com/emcrisostomo/fswatch/releases/download/1.9.3/fswatch-1.9.3.tar.gz
+The initial use case is to make apps with pub-sub and connections, with no backend.
 
-# Random Notes
-## Milestones
+Sea will be built upon, and only run within, modern browser engines. The network stack builds upon WebRTC Data Channels. Computation is done with WebAssembly. This is currently only available in Firefox from version 52 and Chrome from version 57, but the remaining browsers are expected to catch up within the near future. 
 
-### Bion data serialisation
-
-```
-ta = encode({...});
-b = bion(ta);
-b.getIn(['foo', 12]).toJS();
-
-... 
+Bootstrap servers are electron apps, which allows incoming connections by having an open secure websocket server. Otherwise they are identical to the other peers in the sea. Bootstrap servers are only used to make the initial connection. All other connections are created peer-to-peer through the sea.
 
 
-socket.onmessage = (msg) => {
-  if(bion(msg).getIn('dst').toJS() === ...) {
-    otherSocket.send(msg)
-  } else {
-    bion(msg).toJS() ...
-  }
-}
+## Roadmap / API
 
-```
+- HashAddresses
+    - `sea.call('sea:nearest', addr)  →   Promise(addr)`
+    - `HashAddress.make(ArrayBuffer | String) →  Promise(addr)`
+    - `HashAddress.from(ArrayBuffer | String) →  addr`
+    - `addr.randomise(startBit)  →   addr`
+    - `addr.getArrayBuffer() →  ArrayBuffer`
+    - `addr.toString() →  String`
+    - `addr.equals(addr)  →   Boolean`
+    - `addr.dist(addr)  →  Number` xor-distance between two addresses, - with 24 significant bits, and with an offset such that the distance between `0x000..` and `0x800...` is `2 ** 126`, and distance `0x1111..` and `0x1010111..` is `2**125 + 2**123`. Smallest distance is `2**-97`. This also means that the distance can be represented within a single precision float.
+    - `addr.logDist() →  Number` index of first bit in addr that is different.
+- Connect to Sea
+    - `sea = require('peersea')  →   ()`
+    - `sea.localId()  →   addr`
+    - `sea.connections()  →   Array(addr..)`
+    - `sea.goOnline([bootstrapServer])  →   Promise()`
+    - `sea.goOffline()  →   Promise()` 
+    - `sea.online()  →   Boolean`
+    - `sea.on('online', () => ..)  →   ()`
+    - `sea.on('offline', () => ..)  →   ()`
+- RPC to any node in the network (for making connections etc.)
+    - `sea.handle(scope, (args..) => Promise(..))`
+    - `sea.call(addr, scope, args..)  →   Promise(..)`
+- Direct communication between peers
+    - `sea.connect(remoteId : addr)  →   con`
+    - `sea.on('connection', (con) => ..)  →   ()`
+    - `con.remoteId()  →   addr` 
+    - `con.disconnect()  →   ()`
+    - `con.connected()  →   Boolean`
+    - `con.on('connect', () => ..)  →   ()`
+    - `con.on('disconnect', () => ..)  →   ()`
+    - `con.send(scope, obj)  →   ()`
+    - `con.on(scope, (obj) => ..)  →   ()`
+- Pubsub
+    - `sea.join(channelId)  →   chan`
+    - `chan.channelId()`  →   `String` 
+    - `chan.disconnect()`
+    - `chan.connected()  →   Boolean`
+    - `chan.on('connect', () => ..)`
+    - `chan.on('disconnect', () => ..)`
+    - `chan.send(scope, obj)`
+    - `chan.on(scope, (obj) => ..)`
 
-### p2p webrtc create connection
+## Notes
 
-and kademlie-like addressing
+Concepts:
 
-### p2p tagging of self, and possibility to search for peers with a given tag
+- An *entity* has a balance of credit to/from other entities, and is able to add a verifiable signature to data.
+- A *node* is a computer(webbrowser/server/smartphone/...) connected to other nodes in the *sea*. A node is a computational *entity*, and can make sigatures via public/private-key cryptography. A node has resources: storage, network, computing power, - and can deliver this as services to other entities. Services can be paid by updating the credit balance between the entities.
+- The *sea* is the entire network of online connected nodes.
 
-### Immutables on top of bion
+Long term vision:
 
-- Bion + immutables
-- p2p webrtc create-connection
-- proxy-server for legacy browsers
-
-
-## DHT
-
-## Concepts
-
-- unit
-    - has a balance of debt to/from other units
-    - able to sign digitally
-- node (computational unit)
-    - has 
-
-
-- services
-    - deliver a message/response
-    - do a computation
-    - fetch data given hash
-
-## Technologies
-
-- Rust/WebAssembly - access to i64 will make things easier
-
-## Milestones
-
-### Basic running environment
-
-
-### Connection through Sea
-- environment running
-- send 
+- sharing/market of computing resources
+- economic system
+- shared "clock" with a "tick" each ~10 sec / blockchain with list of all peers, and common accounting
+    - secure computations / contracts running on top of the blockchain.
+    - storage within the sea

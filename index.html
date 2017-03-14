@@ -3,20 +3,18 @@
   <head>
   </head>
   <body>
-    <h1>Sea</h1>
-
-    <p>
-    Under development, not usable yet..
-
-    <p>
-    The intention of sea is to be a core for building distributed web applications.
-
-    <h2>Technologies</h2>
-    <p>
-    Sea will build upon modern web technologies, such as WebRTC Data Channels, and WebAssembly. This is currently only available in Firefox from version 52 and Chrome from version 57, but the remaining browsers are expected to catch up within the near future.
-
-    <hr>
-
+    <div id=readme></div>
+    <script src=https://unpkg.com/reun@0.1></script>
+    <script>
+reun.run(`
+    var showdown = new (require('showdown@1.6.0')).Converter();
+    var xhr = new XMLHttpRequest();
+    xhr.onloadend = function() { 
+      readme.innerHTML = showdown.makeHtml(xhr.responseText);
+    };
+    xhr.open('GET', './README.md'); xhr.send();
+    `,location.href);
+    </script>
     <script async src=dist.js></script>
     <script>document.write('<script async src="//incoming.solsort.com/log.js?' + location.protocol + '//' + location.host + location.pathname + location.search + '"></s' + 'cript>');</script>
   </body>
