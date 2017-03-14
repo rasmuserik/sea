@@ -1,3 +1,10 @@
 language: node_js
 node_js:
 - node
+deploy:
+  provider: npm
+  email: npmjs@solsort.com
+  api_key:
+    secure: U8KGmQPmNviiOejD6CTahe07JSmyVab4HFbfgJasWI5Io2fZy54djWGcoXxiVPBdSUx2EMcY76r4SaBmuPYD/CXt9Zn/aXMIX9YID9DK7AV5j+3RuuubyXBrl7cCV7moHyWMKN/v10C65lnJugUAOqI+/L2PyMxnM0JzaRyZa8OS7bJg1WPxEQvh3IC8zePXVYTH31PWxdrB2FyfkHde6Il2ne9P3LWNS8S2QX0jkmLKLZd+GrzZUmoTECl79c8yX5hb5v0CgV1aRnlgLSfMGpW7xrI7PnsEJcvn72vu7EKyhN5blD5u5LwMpcYaAT21JnO+PWLCaVkWmRbUiP/YIfuIlt5UryLTomN096J3UhEyRcLk0VegUkBtPffqgFSO+OTPcPfjdeuafPBwMPU7U36mGWlhD+pBdg6XH/TgY66JPrTEs0npA7I3v0jCkWSDSOEIzpmZFLTrg4AOXS9a0pUIG3Ed7c05fvamCAPW1NCdP95kYW90cR0EQspPndgfDK8pPXZMdV7XgegEXll8jhZY/+Zx+dUZs+MDR8RK8xXX7aX84/bSpWBxZ/o3+audECs6jUM6Kryl2FOTjngDfD4Bk45jtyklf9tolXL+vFHq7qkuC4NZVRtB47uY/GYK3bZydOb8pBojBnUHlhDajqsSTk9kvK4q+B4uV1QNO60=
+  on:
+    repo: solsort/sea
