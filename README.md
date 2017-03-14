@@ -13,14 +13,13 @@ Bootstrap servers are electron apps, which allows incoming connections by having
 ## Roadmap / API
 
 - HashAddresses
-    - `sea.call('sea:nearest', addr)  →   Promise(addr)`
     - `HashAddress.make(ArrayBuffer | String) →  Promise(addr)`
     - `HashAddress.from(ArrayBuffer | String) →  addr`
     - `addr.randomise(startBit)  →   addr`
     - `addr.getArrayBuffer() →  ArrayBuffer`
     - `addr.toString() →  String`
     - `addr.equals(addr)  →   Boolean`
-    - `addr.dist(addr)  →  Number` xor-distance between two addresses, - with 24 significant bits, and with an offset such that the distance between `0x000..` and `0x800...` is `2 ** 126`, and distance `0x1111..` and `0x1010111..` is `2**125 + 2**123`. Smallest distance is `2**-97`. This also means that the distance can be represented within a single precision float.
+    - `addr.dist(addr)  →  Number` xor-distance between two addresses, - with 24 significant bits, and with an offset such that the distance between `0x000..` and `0x800...` is `2 ** 126`, and distance `0b1111..` and `0b1010111..` is `2**125 + 2**123`. Smallest distance is `2**-97`. This also means that the distance can be represented within a single precision float.
     - `addr.logDist() →  Number` index of first bit in addr that is different.
 - Connect to Sea
     - `sea = require('peersea')  →   ()`
@@ -34,6 +33,7 @@ Bootstrap servers are electron apps, which allows incoming connections by having
 - RPC to any node in the network (for making connections etc.)
     - `sea.handle(scope, (args..) => Promise(..))`
     - `sea.call(addr, scope, args..)  →   Promise(..)`
+    - `sea.call(addr, 'sea:nearest', addr)  →   Promise(addr)`
 - Direct communication between peers
     - `sea.connect(remoteId : addr)  →   con`
     - `sea.on('connection', (con) => ..)  →   ()`
