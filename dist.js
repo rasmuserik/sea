@@ -952,9 +952,33 @@ async function main() { // ##
     }
   }
 }
-function connectVia(a, b) { // ##
+async function connectVia(a, b) { // ##
+  var con = new RTCPeerConnection({ 'iceServers': iceServers });
+  console.log('con', con);
+  con.onicecandidate = (e) => {
+    console.log('ice-candidate');
+    if(e.candidate) {
+      call(a, 'call', b, 'webrtc-request', con.localDescription, sea.id);
+    }
+    console.log('onicecandidata', e);
+  }
+  /*
+  var con = getCon(peerIds[0], true);
+  */
+  var offer = await con.createOffer();
+  con.setLocalDescription(offer);
+  var chan = con.createDataChannel("sendChannel", {
+    ordered: false
+  });
+  con.ondatachannel = (e) => {
+    setupChan(e.channel);
+    console.log('ondatachannel', e);
+    e.channel.send('hi');
+  };
   console.log('connectVia', a, b, sea.id);
+  console.log(con, offer);
   call(a, 'call', b, 'hello', 'abc');
+  //call(a, 'call', b, 'webrtc-offer');
 }
 exportFn('hello', (x) => console.log('hello ' + x));
 
@@ -1047,7 +1071,7 @@ function sleep(ms) {// ###
 }
 
 // # Old
-(async function() {
+(async function() { // ##
 
 
   if(self.node_modules) {
@@ -1059,7 +1083,7 @@ function sleep(ms) {// ###
     document.body.innerHTML += s;
   }
 
-  async function browserMainX() {
+  async function browserMainX() { // ##
     var ws = new WebSocket('ws://localhost:8888/');
     ws.addEventListener('message', (msg) => {
       console.log('message', msg);
@@ -1075,8 +1099,8 @@ function sleep(ms) {// ###
       console.log('error', msg);
     });
   }
-  async function browserMain() {
-    console.log('browser');
+  async function browserMain() { // ##
+    console.log('browser'); // ###
     var id;
     var peerIds;
     var ws = new WebSocket('ws://localhost:8888/');
@@ -1098,11 +1122,10 @@ function sleep(ms) {// ###
       }
     });
 
-
     var connections = self.cons = {};
     var chans = self.chans = {};
 
-    function setupChan(chan, target) {
+    function setupChan(chan, target) { // ###
       chan.onopen = (e) => {
         console.log('onopen', e);
         setTimeout(() => e.target.send('hello'), 500);
@@ -1116,7 +1139,7 @@ function sleep(ms) {// ###
       chans[target ] = chan;
     }
 
-    function getCon(target, createChan) {
+    function getCon(target, createChan) { // ###
       if(connections[target]) {
         return connections[target];
       }
@@ -1150,7 +1173,7 @@ function sleep(ms) {// ###
       return con;
     }
 
-    async function connect(msg) {
+    async function connect(msg) { // ###
       console.log('connect', msg);
       if(!msg) {
         var con = getCon(peerIds[0], true);
@@ -1170,7 +1193,7 @@ function sleep(ms) {// ###
     }
   }
 });
-(async () => {
+(async () => { // ##
 
   var CBOR;
   // QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
