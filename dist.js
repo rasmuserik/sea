@@ -63,254 +63,243 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 2);
+/******/ 	return __webpack_require__(__webpack_require__.s = 4);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
 /***/ (function(module, exports, __webpack_require__) {
 
-//
-//
-// - num
-//     - 0x00- negative int
-//     - 0x1f double
-//     - 0x20- positive int
-//     - 0x3f null
-// - varstr
-//     - 0x40- string
-//     - 0x5f true
-//     - 0x60- binary
-//     - 0x7f false
-// - stream
-//     - 0x80- array-stream
-//     - 0x9f end-of-stream
-//     - 0xa0- obj-stream
-// - indexed Not implemented yet
-//     - 0xc0- array
-//     - 0xe0- object
-//
+/* WEBPACK VAR INJECTION */(function(module, process) {/*
+ * Hashes as addresses, and utility functions for Kademlia-like routing.
+ */
+class HashAddress { // #
 
-
-// # State
-
-var buf = new Uint8Array(1024); 
-var converter = new ArrayBuffer(8);
-var converterFloat = new Float64Array(converter);
-var converterBytes = new Uint8Array(converter);
-var pos;
-var END = {};
-
-// # Utility
-function addByte(b) { // ##
-  if(pos >= buf.length) {
-    var t = new Uint8Array(pos * 2 | 0);
-    t.set(buf);
-    buf = t;
-  }
-  buf[pos++] = b;
-}
-
-function writeFloat(d) { // ##
-  converterFloat[0] = d;
-  for(var i = 0; i < 8; ++i) {
-    addByte(converterBytes[i]);
-  }
-}
-
-function writeHeader(type, i) { // ##
-  if(i < 30) {
-    addByte(type | i);
-  } else {
-    addByte(type | 30);
-    vbenc(i - 30);
-  }
-}
-
-function vbenc(i) { // ##
-  if(i >= 128) {
-    if(i >= 128*128) {
-      if(i >= 128*128*128) {
-        if(i >= 128*128*128*128) {
-          addByte((i >> 28) | 128);
-        }
-        addByte((i >> 21) | 128);
-      }
-      addByte((i >> 14) | 128);
-    }
-    addByte((i >> 7) | 128);
-  }
-  addByte(i & 127);
-}
-function utf8length(str) { // ##
-  var len = 0;
-  for(var i = 0; i < str.length; ++i) {
-    var c = str.charCodeAt(i);
-    ++len;
-    if(c > 127) ++len;
-    if(c > 0x7FF) ++len;
-  }
-  return len;
-}
-function writeUtf8(str) { // ##
-  for(var i = 0; i < str.length; ++i) {
-    var c = str.charCodeAt(i);
-    if(c < 128) {
-      addByte(c);
-    } else { // utf-8 encoding of UCS-2
-      if(c <= 0x7FF) {
-        addByte((0x80 | 0x40) | (c >> 6));
-        addByte((0x80) | (c & 0x3f));
-      } else {
-        addByte((0x80 | 0x40 | 0x20 ) | (c >> 12));
-        addByte((0x80) | ((c >> 6) & 0x3f));
-        addByte((0x80) | (c & 0x3f));
-      }
-    }
-  }
-}
-
-function readFloat(buf, pos) { // ##
-  for(var i = 0; i < 8; ++i) {
-    converterBytes[i] = buf[pos+i];
-  }
-  return [converterFloat[0], pos + 8];
-}
-
-function readStr(buf, pos, end) { // ##
-  var result = '';
-  while(pos < end) {
-    var c = buf[pos++];
-    if(c & 128) { // utf-8 decoding into UCS-2
-      var b = c;
-      c = ((c & 0x1f) << 6) | (buf[pos++] & 0x3f);
-      if((b & 0xe0) === 0xe0) { // three
-        c = (c << 6) | (buf[pos++] & 0x3f);
-      }
-    }
-    result += String.fromCharCode(c);
-  }
-  return [result, pos];
-}
-
-// # encode
-function encode(o) {
-  if(o === null) return addByte(0x3f);
-  if(o === true) return addByte(0x5f);
-  if(o === false) return addByte(0x7f);
-  if(o === END) return addByte(0x9f);
-  if(typeof o === 'number') {
-    if(o === (o|0)) {
-      if(o < 0) {
-        return writeHeader(0x00, ~o);
-      } else {
-        return writeHeader(0x20, o);
-      }
-    }
-    addByte(0x1f);
-    return writeFloat(o);
-  }
-  if(typeof o === 'string') {
-    writeHeader(0x40, utf8length(o));
-    return writeUtf8(o);
-  }
-  if(Array.isArray(o) || o.constructor === Object) {
-    var type;
-    var len;
-    if(Array.isArray(o)) {
-        type = 0x80;
-        len= o.length;
+  constructor(o) { // ##
+    if(o instanceof Uint8Array && o.length === 32) {
+      this.data = o;
     } else {
-        type = 0xa0;
-        var arr = [];
-        for(var k in o) {
-          arr.push(k, o[k]);
-        }
-        len  = (arr.length / 2);
-        o = arr;
+      throw new Error();
     }
-    writeHeader(type, len + 1);
-    for(var i = 0; i < o.length; ++i) {
-      encode(o[i]);
-    }
-    return;
   }
-  if(o.constructor === Uint8Array) {
-    writeHeader(0x60, o.length);
-    for(var i = 0; i < o.length; ++i) {
-      addByte(o[i]);
-    }
-    return;
-  }
-}
-// # decode
-function decode(buf, pos) {
-  var type = buf[pos++];
-  var num;
-  if((type & 31) < 30) {
-    num = type & 31;
-  } else if((type & 31) === 30) {
-    num = 0;
-    do {
-      var c = buf[pos++];
-      num = (num << 7)+ (c & 127);
-    } while(c & 128);
-    num += 30;
-  } else {
-    if(type === 0x1f) return readFloat(buf, pos);
-    if(type === 0x3f) return [null, pos];
-    if(type === 0x5f) return [true, pos];
-    if(type === 0x7f) return [false, pos];
-    if(type === 0x9f) return [END, pos];
-  }
-  switch(type >>> 5) {
-    case 0: // ## Negative Number
-      return [~num, pos];
-    case 1: // ## Positive Number
-      return [num, pos];
-    case 2: // ## String
-        return readStr(buf, pos, pos+num);
-    case 3: // ## Binary
-      return [buf.slice(pos, pos + num), pos];
-    case 4: case 5: // ## Streamable collections
-      if(num === 0) {
-        throw 'Streamed collections not implemented yet.';
-      }
-      --num;
-      if(type >>> 5 === 5) { // Object
-        num = 2*num;
-      }
-      var arr = new Array(num);
-      for(var i = 0; i < num; ++i) {
-        [arr[i], pos] = decode(buf, pos)
-      }
-      if(type >>> 5 === 5) { // Object
-        var result = {};
-        for(var i = 0; i < arr.length; i += 2) {
-          result[arr[i]] = arr[i + 1];
-        }
-        return [result, pos];
-      }
-      return [arr, pos];
 
-    case 6: case 7: // ## Indexed collections
-      throw 'indexed collections not implemented yet.';
+  static async generate (src /*ArrayBuffer | String*/) { // ##
+    if(typeof src === 'string') {
+      src = ascii2buf(src);
+    }
+    let hash = await crypto.subtle.digest('SHA-256', src);
+    return new HashAddress(new Uint8Array(hash));
+  }
+
+  equals(addr) { // ##
+    for(let i = 0; i < 32; ++i) {
+      if(this.data[i] !== addr.data[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static async TEST_constructor_generate_equals() { // ##
+    if(typeof crypto === 'undefined') {
+      return;
+    }
+    let a = await HashAddress.generate('hello world');
+    let b = await HashAddress.generate('hello world');
+    let c = await HashAddress.generate('hello wørld');
+    a.equals(b) || throwError('equals1');
+    !a.equals(c) || throwError('equals2');
+  }
+
+  static fromUint8Array(buf) { // ##
+    return new HashAddress(buf.slice());
+  }
+  toUint8Array() { // ##
+    return this.data.slice();
+  }
+
+  static fromArrayBuffer(buf) { // ##
+    return HashAddress.fromUint8Array(new Uint8Array(buf));
+  }
+
+  static fromString(str) { // ##
+    return HashAddress.fromArrayBuffer(ascii2buf(atob(str)));
+  }
+
+  static fromHex(str) {  // ##
+    return HashAddress.fromArrayBuffer(hex2buf(str));
+  }
+
+  toArrayBuffer() { // ##
+    return this.data.slice().buffer;
+  }
+
+  toString() { // ##
+    return btoa(buf2ascii(this.toArrayBuffer()));
+  }
+
+  toHex() { // ##
+    return buf2hex(this.toArrayBuffer());
+  }
+
+
+  static async TEST_from_toArrayBuffer_toString() { // ##
+    let a = await HashAddress.generate('hello');
+    let b = HashAddress.fromArrayBuffer(a.toArrayBuffer());
+    let c = HashAddress.fromString(a.toString());
+    let x80 = HashAddress.fromString('gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+    a.equals(b) || throwError();
+    a.equals(c) || throwError();
+    x80.toHex().startsWith('800') || throwError();
+  }
+
+  // ## .dist(addr)
+  /*
+   * xor-distance between two addresses, - with 24 significant bits, 
+   * and with an offset such that the distance between `0x000..` 
+   * and `0x800...` is `2 ** 123`, and distance `0b1111..` and 
+   * `0b1010111..` is `2**122 + 2**120`. 
+   * This also means that the distance can be represented 
+   * within a single precision float. (with some loss on least significant bits)
+   */
+  dist(addr) {
+    let a = new Uint8Array(this.data);
+    let b = new Uint8Array(addr.data);
+    for(let i = 0; i < 32; ++i) {
+      if(a[i] !== b[i]) {
+        return (2 ** (93 - i*8)) *
+          (((a[i] ^ b[i]) << 23) |
+          ((a[i + 1] ^ b[i + 1]) << 15) |
+          ((a[i + 2] ^ b[i + 2]) << 7) |
+          ((a[i + 3] ^ b[i + 3]) >> 1));
+      }
+    }
+    return 0;
+  }
+
+  // ## distBit(addr)
+  /* 
+   * index of first bit in addr that is different. 
+   */
+  distBit(addr) {
+    return HashAddress.distBit(this.dist(addr));
+  }
+
+  // ## static distBit(addr)
+  /*
+   * addr1.logDist(addr2) === HashAddress.logDist(addr1.dist(addr2))
+   */
+  static distBit(dist) {
+    return 123 - Math.floor(Math.log2(dist));
+  }
+
+  static TEST_dist() { // ##
+    let h;
+    let zero = 
+      HashAddress.fromHex('0000000000000000000000000000000000000000000000000000000000000000');
+
+    h=HashAddress.fromHex('0000000000000000000000000000001000000000000000000000000000000000');
+    zero.dist(h) === 1 || throwError();
+
+    h=HashAddress.fromHex('8000000000000000000000000000000000000000000000000000000000000000');
+    zero.dist(h) === 2 ** 123 || throwError();
+    zero.distBit(h) === 0 || throwError();
+
+    h=HashAddress.fromHex('0000000000000000000000000000000000000000000000000000000000000001');
+    zero.dist(h) === 2 ** -132|| throwError();
+    zero.distBit(h) === 255 || throwError();
+
+    h=HashAddress.fromHex('0f00000000000000000000000000000000000000000000000000000000000000');
+    zero.distBit(h) === 4 || throwError();
+  }
+
+  // ## flipBitRandomise
+  /**
+   * Flip the bit at pos, and randomise every bit after that
+   */
+  flipBitRandomise(pos) {
+    let src = new Uint8Array(this.data);
+    let dst = src.slice();
+    let bytepos = pos >> 3;
+    crypto.getRandomValues(dst.subarray(bytepos));
+
+    let mask = 0xff80 >> (pos & 7);
+    let inverse = 0x80 >> (pos & 7);
+    dst[pos >> 3] = (src[bytepos] & mask) | (dst[bytepos] & ~mask) ^ inverse;
+
+    return new HashAddress(dst);
+  }
+
+  static TEST_flipBitRandomise() { // ##
+    let zero = 
+      HashAddress.fromHex('0000000000000000000000000000000000000000000000000000000000000000');
+
+    zero.flipBitRandomise(3).toHex().startsWith('1') || throwError();
+    zero.flipBitRandomise(7).toHex().startsWith('01') || throwError();
+    zero.flipBitRandomise(7+8).toHex().startsWith('0001') || throwError();
   }
 }
-// # exports
-var bion;
-if(true) {
-  bion = exports;
-} else {
-  bion = self.Bion = {};
-}
-bion.encode = (o) => {
-  pos = 0;
-  encode(o);
-  return buf.slice(0, pos);
-}
-bion.decode = (o) => decode(o, 0)[0];
 
+
+// # Utility functions
+
+function hex2buf(str) { // ##
+  let a = new Uint8Array(str.length / 2);
+  for(let i = 0; i < str.length; i += 2) {
+    a[i / 2] = parseInt(str.slice(i, i+2), 16);
+  }
+  return a.buffer;
+}
+function buf2hex(buf) { // ##
+  let a = new Uint8Array(buf);
+  let str = '';
+  for(var i = 0; i < a.length; ++i) {
+    str += (0x100 + a[i]).toString(16).slice(1);
+  }
+  return str;
+}
+function ascii2buf(str) { // ##
+  let a = new Uint8Array(str.length);
+  for(let i = 0; i < a.length; ++i) {
+    a[i] = str.charCodeAt(i);
+  }
+  return a.buffer;
+}
+
+function buf2ascii(buf) { // ##
+  let a = new Uint8Array(buf);
+  return String.fromCharCode.apply(String, a);
+}
+
+function throwError(msg) { // ##
+  throw new Error(msg);
+}
+
+// # Export + testrunner
+(()=>{
+  let runTest = (cls) => Promise.all(
+      Object.getOwnPropertyNames(HashAddress)
+      .filter(k => k.startsWith('TEST_'))
+      .map(k => (console.log(k), k))
+      .map(k => HashAddress[k]())
+      .map(v => Promise.resolve(v)));
+
+  if(true) {
+    module.exports = HashAddress;
+    if(__webpack_require__.c[__webpack_require__.s] === module) {
+      runTest(HashAddress)
+        .then(() => process.exit(0))
+        .catch(e => {
+          console.log(e);
+          process.exit(0);
+        });
+    }
+  } else if(typeof RUNTEST_hashaddress !== 'undefind') {
+    runTest(HashAddress);
+  }
+})()
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)(module), __webpack_require__(2)))
 
 /***/ }),
 /* 1 */
@@ -622,533 +611,6 @@ function isUndefined(arg) {
 
 /***/ }),
 /* 2 */
-/***/ (function(module, exports, __webpack_require__) {
-
-// # Sea.js
-//
-let EventEmitter = __webpack_require__(1);
-let HashAddress = __webpack_require__(3);
-let bion= __webpack_require__(0);
-let sea = new EventEmitter();
-sea.net = new EventEmitter();
-let publicKey;
-module.exports = sea;
-
-var connections = [];
-
-
-// ## Handle connection
-sea.on('connect:socket', (con) => {
-  con.send({
-    type: 'helo',
-    id: sea.id.toUint8Array()
-  });
-  var id;
-  con.once('message', (msg) => {
-    id = HashAddress.fromUint8Array(msg.id);
-    connections.push({id: id, con: con});
-    con.on('message', (msg) => {
-      if(sea.id.equals(HashAddress.fromUint8Array(msg.dst))) {
-        sea.net.emit(msg.type, msg, id);
-      } else {
-        relay(msg);
-      }
-    });
-    console.log('Connected to ' + id.toHex());
-  });
-
-  con.on('close', () => {
-    connections = connections.filter(o => !o.id.equals(id));
-    console.log('close');
-  });
-});
-
-main();
-
-async function main() { // ##
-  await generateId();
-  if(self.node_modules) {
-    startWsServer();
-  } else {
-    let connected = false;
-    while(!connected) {
-      try {
-        await connectToWs('ws://localhost:8888/');
-        connected = true;
-      } catch(e) {
-        console.log('error', e);
-        await sleep(1000);
-      }
-    }
-  }
-}
-
-async function generateId() { // ##
-  let key = await crypto.subtle.generateKey({
-    name: 'ECDSA', 
-    namedCurve: 'P-521'
-  }, true, ['sign', 'verify']);
-  publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
-  sea.id = await HashAddress.generate(publicKey);
-  sea.emit('ready');
-  console.log('My id: ' + sea.id.toHex());
-}
-
-function connectToWs(host) { // ##
-  return new Promise((resolve, reject) => {
-    let ws = new WebSocket(host);
-    ws.binaryType = 'arraybuffer';
-    let con = new EventEmitter();
-    con.send = (o) => ws.send(encode(o));
-    con.close = () => ws.close();
-    ws.addEventListener('message', (msg) => {
-      con.emit('message', decode(msg.data));
-    });
-    ws.addEventListener('open', (msg) => {
-      sea.emit('connect:socket', con);
-      resolve();
-    });
-    ws.addEventListener('close', (msg) => {
-      con.emit('close');
-    });
-    ws.addEventListener('error', (msg) => {
-      reject(msg);
-    });
-  });
-}
-
-function startWsServer() { // ##
-  let server = node_modules.http.createServer();
-  let  wss = new node_modules.ws.Server({server: server});
-
-  let sockets = {};
-  wss.on('connection', (ws) => {
-    let con = new EventEmitter();
-    con.send = (o) => ws.send(encode(o));
-    con.close = (o) => ws.close();
-
-    sea.emit('connect:socket', con);
-    ws.on('message', (msg) => con.emit('message', decode(msg)));
-    ws.on('close', () => con.emit('close'));
-    ws.on('error', (e) => con.emit('error', e));
-  });
-
-  server.listen(8888, () => {
-    console.log('Started websocket server on port: ' + server.address().port);
-  });
-}
-
-// ## Utility functions
-function encode(obj) { // ###
-  return bion.encode(obj).buffer;
-}
-
-function decode(obj) { // ###
-  return bion.decode(new Uint8Array(obj));
-}
-
-function sleep(ms) {// ###
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// # Old
-(async function() {
-
-
-  if(self.node_modules) {
-  } else { // isBrowser
-    setTimeout(browserMain, 200 + 200 * Math.random());
-  }
-
-  function print(s) {
-    document.body.innerHTML += s;
-  }
-
-  async function browserMainX() {
-    var ws = new WebSocket('ws://localhost:8888/');
-    ws.addEventListener('message', (msg) => {
-      console.log('message', msg);
-    });
-    ws.addEventListener('open', (msg) => {
-      ws.send(bion.encode({type: 'helo', data: 'me'}));
-      console.log('open', msg);
-    });
-    ws.addEventListener('close', (msg) => {
-      console.log('close', msg);
-    });
-    ws.addEventListener('error', (msg) => {
-      console.log('error', msg);
-    });
-  }
-  async function browserMain() {
-    console.log('browser');
-    var id;
-    var peerIds;
-    var ws = new WebSocket('ws://localhost:8888/');
-    ws.addEventListener('message', (msg) => {
-      msg = JSON.parse(msg.data);
-      console.log(msg);
-      switch(msg.mbox) {
-        case 'welcome':
-          id = msg.id;
-          peerIds = msg.peers;
-          print(`id: ${id}<br>`);
-          if(peerIds.length) {
-            connect();
-          }
-          break;
-        case 'ice':
-          connect(msg);
-          break;
-      }
-    });
-
-    // Stun server list from https://gist.github.com/zziuni/3741933
-    var iceServers = ['stun.l.google.com:19302', 'stun1.l.google.com:19302',
-    'stun2.l.google.com:19302', 'stun3.l.google.com:19302',
-    'stun4.l.google.com:19302', 'stun01.sipphone.com', 'stun.ekiga.net',
-    'stun.fwdnet.net', 'stun.ideasip.com', 'stun.iptel.org',
-    'stun.rixtelecom.se', 'stun.schlund.de', 'stunserver.org',
-    'stun.softjoys.com', 'stun.voiparound.com', 'stun.voipbuster.com',
-    'stun.voipstunt.com', 'stun.voxgratia.org', 'stun.xten.com'];
-    iceServers = iceServers.map(s => ({url: 'stun:' + s}));
-
-    var connections = self.cons = {};
-    var chans = self.chans = {};
-
-    function setupChan(chan, target) {
-      chan.onopen = (e) => {
-        console.log('onopen', e);
-        setTimeout(() => e.target.send('hello'), 500);
-      };
-      chan.onmessage = (e) => {
-        console.log('onmessage', e);
-      };
-      chan.onclose= (e) => {
-        console.log('onclose', e);
-      };
-      chans[target ] = chan;
-    }
-
-    function getCon(target, createChan) {
-      if(connections[target]) {
-        return connections[target];
-      }
-
-      var con = new RTCPeerConnection({ 'iceServers': iceServers });
-      con.ondatachannel = (e) => {
-        setupChan(e.channel);
-        console.log('ondatachannel', e);
-        e.channel.send('hi');
-      };
-      con.onicecandidate = (e) => {
-        if(e.candidate) {
-          ws.send(JSON.stringify({
-            src: id,
-            dst: target,
-            mbox: 'ice', 
-            ice: con.localDescription, 
-          }));
-        } else {
-        }
-        console.log('onicecandidata', e);
-      }
-      connections[target] = con;
-
-      if(createChan) {
-        var chan = con.createDataChannel("sendChannel", {
-          ordered: false
-        });
-        setupChan(chan, target);
-      }
-      return con;
-    }
-
-    async function connect(msg) {
-      console.log('connect', msg);
-      if(!msg) {
-        var con = getCon(peerIds[0], true);
-        var offer = await con.createOffer();
-        con.setLocalDescription(offer);
-
-      } else if(msg.ice) {
-        console.log('got ice', msg.ice);
-        var con = getCon(msg.src);
-        con.setRemoteDescription(new RTCSessionDescription(msg.ice));
-
-        if(msg.ice.type === 'offer') {
-          var answer = await con.createAnswer();
-          con.setLocalDescription(answer);
-        }
-      }
-    }
-  }
-});
-(async () => {
-
-  var CBOR;
-  // QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
-  json = { 
-    "Data":"", 
-    "Links":[],
-  };
-  var cbor = CBOR.encode(json)
-    var ua = Array.from(new Uint8Array(cbor));
-  console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
-  var d1 = new Uint8Array(cbor.byteLength + 1);
-  console.log(d1, cbor);
-  d1[0] = 0x51;
-  d1.set(new Uint8Array(cbor), 1);
-  data = d1;
-  var ua = Array.from(new Uint8Array(data));
-  console.log('x', data.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
-  var hash = await crypto.subtle.digest('SHA-256', data);
-  console.log('hash', hash, hash.byteLength);
-  var ta = new Uint8Array(34);
-  ta[0] = 0x12;
-  ta[1] = 0x20;
-  ta.set(new Uint8Array(hash), 2);
-  console.log(ta, Base58.encode(ta), hash);
-})
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* WEBPACK VAR INJECTION */(function(module, process) {/*
- * Hashes as addresses, and utility functions for Kademlia-like routing.
- */
-class HashAddress { // #
-
-  constructor(o) { // ##
-    if(o instanceof Uint8Array && o.length === 32) {
-      this.data = o;
-    } else {
-      throw new Error();
-    }
-  }
-
-  static async generate (src /*ArrayBuffer | String*/) { // ##
-    if(typeof src === 'string') {
-      src = ascii2buf(src);
-    }
-    let hash = await crypto.subtle.digest('SHA-256', src);
-    return new HashAddress(new Uint8Array(hash));
-  }
-
-  equals(addr) { // ##
-    for(let i = 0; i < 32; ++i) {
-      if(this.data[i] !== addr.data[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  static async TEST_constructor_generate_equals() { // ##
-    if(typeof crypto === 'undefined') {
-      return;
-    }
-    let a = await HashAddress.generate('hello world');
-    let b = await HashAddress.generate('hello world');
-    let c = await HashAddress.generate('hello wørld');
-    a.equals(b) || throwError('equals1');
-    !a.equals(c) || throwError('equals2');
-  }
-
-  static fromUint8Array(buf) { // ##
-    return new HashAddress(buf.slice());
-  }
-  toUint8Array() { // ##
-    return this.data.slice();
-  }
-
-  static fromArrayBuffer(buf) { // ##
-    return HashAddress.fromUint8Array(new Uint8Array(buf));
-  }
-
-  static fromString(str) { // ##
-    return HashAddress.fromArrayBuffer(ascii2buf(atob(str)));
-  }
-
-  static fromHex(str) {  // ##
-    return HashAddress.fromArrayBuffer(hex2buf(str));
-  }
-
-  toArrayBuffer() { // ##
-    return this.data.slice().buffer;
-  }
-
-  toString() { // ##
-    return btoa(buf2ascii(this.toArrayBuffer()));
-  }
-
-  toHex() { // ##
-    return buf2hex(this.toArrayBuffer());
-  }
-
-
-  static async TEST_from_toArrayBuffer_toString() { // ##
-    let a = await HashAddress.generate('hello');
-    let b = HashAddress.fromArrayBuffer(a.toArrayBuffer());
-    let c = HashAddress.fromString(a.toString());
-    let x80 = HashAddress.fromString('gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
-    a.equals(b) || throwError();
-    a.equals(c) || throwError();
-    x80.toHex().startsWith('800') || throwError();
-  }
-
-  // ## .dist(addr)
-  /*
-   * xor-distance between two addresses, - with 24 significant bits, 
-   * and with an offset such that the distance between `0x000..` 
-   * and `0x800...` is `2 ** 123`, and distance `0b1111..` and 
-   * `0b1010111..` is `2**122 + 2**120`. 
-   * This also means that the distance can be represented 
-   * within a single precision float. (with some loss on least significant bits)
-   */
-  dist(addr) {
-    let a = new Uint8Array(this.data);
-    let b = new Uint8Array(addr.data);
-    for(let i = 0; i < 32; ++i) {
-      if(a[i] !== b[i]) {
-        return (2 ** (93 - i*8)) *
-          (((a[i] ^ b[i]) << 23) |
-          ((a[i + 1] ^ b[i + 1]) << 15) |
-          ((a[i + 2] ^ b[i + 2]) << 7) |
-          ((a[i + 3] ^ b[i + 3]) >> 1));
-      }
-    }
-    return 0;
-  }
-
-  // ## distBit(addr)
-  /* 
-   * index of first bit in addr that is different. 
-   */
-  distBit(addr) {
-    return HashAddress.distBit(this.dist(addr));
-  }
-
-  // ## static distBit(addr)
-  /*
-   * addr1.logDist(addr2) === HashAddress.logDist(addr1.dist(addr2))
-   */
-  static distBit(dist) {
-    return 123 - Math.floor(Math.log2(dist));
-  }
-
-  static TEST_dist() { // ##
-    let h;
-    let zero = 
-      HashAddress.fromHex('0000000000000000000000000000000000000000000000000000000000000000');
-
-    h=HashAddress.fromHex('0000000000000000000000000000001000000000000000000000000000000000');
-    zero.dist(h) === 1 || throwError();
-
-    h=HashAddress.fromHex('8000000000000000000000000000000000000000000000000000000000000000');
-    zero.dist(h) === 2 ** 123 || throwError();
-    zero.distBit(h) === 0 || throwError();
-
-    h=HashAddress.fromHex('0000000000000000000000000000000000000000000000000000000000000001');
-    zero.dist(h) === 2 ** -132|| throwError();
-    zero.distBit(h) === 255 || throwError();
-
-    h=HashAddress.fromHex('0f00000000000000000000000000000000000000000000000000000000000000');
-    zero.distBit(h) === 4 || throwError();
-  }
-
-  // ## flipBitRandomise
-  /**
-   * Flip the bit at pos, and randomise every bit after that
-   */
-  flipBitRandomise(pos) {
-    let src = new Uint8Array(this.data);
-    let dst = src.slice();
-    let bytepos = pos >> 3;
-    crypto.getRandomValues(dst.subarray(bytepos));
-
-    let mask = 0xff80 >> (pos & 7);
-    let inverse = 0x80 >> (pos & 7);
-    dst[pos >> 3] = (src[bytepos] & mask) | (dst[bytepos] & ~mask) ^ inverse;
-
-    return new HashAddress(dst);
-  }
-
-  static TEST_flipBitRandomise() { // ##
-    let zero = 
-      HashAddress.fromHex('0000000000000000000000000000000000000000000000000000000000000000');
-
-    zero.flipBitRandomise(3).toHex().startsWith('1') || throwError();
-    zero.flipBitRandomise(7).toHex().startsWith('01') || throwError();
-    zero.flipBitRandomise(7+8).toHex().startsWith('0001') || throwError();
-  }
-}
-
-
-// # Utility functions
-
-function hex2buf(str) { // ##
-  let a = new Uint8Array(str.length / 2);
-  for(let i = 0; i < str.length; i += 2) {
-    a[i / 2] = parseInt(str.slice(i, i+2), 16);
-  }
-  return a.buffer;
-}
-function buf2hex(buf) { // ##
-  let a = new Uint8Array(buf);
-  let str = '';
-  for(var i = 0; i < a.length; ++i) {
-    str += (0x100 + a[i]).toString(16).slice(1);
-  }
-  return str;
-}
-function ascii2buf(str) { // ##
-  let a = new Uint8Array(str.length);
-  for(let i = 0; i < a.length; ++i) {
-    a[i] = str.charCodeAt(i);
-  }
-  return a.buffer;
-}
-
-function buf2ascii(buf) { // ##
-  let a = new Uint8Array(buf);
-  return String.fromCharCode.apply(String, a);
-}
-
-function throwError(msg) { // ##
-  throw new Error(msg);
-}
-
-// # Export + testrunner
-(()=>{
-  let runTest = (cls) => Promise.all(
-      Object.getOwnPropertyNames(HashAddress)
-      .filter(k => k.startsWith('TEST_'))
-      .map(k => (console.log(k), k))
-      .map(k => HashAddress[k]())
-      .map(v => Promise.resolve(v)));
-
-  if(true) {
-    module.exports = HashAddress;
-    if(__webpack_require__.c[__webpack_require__.s] === module) {
-      runTest(HashAddress)
-        .then(() => process.exit(0))
-        .catch(e => {
-          console.log(e);
-          process.exit(0);
-        });
-    }
-  } else if(typeof RUNTEST_hashaddress !== 'undefind') {
-    runTest(HashAddress);
-  }
-})()
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)(module), __webpack_require__(4)))
-
-/***/ }),
-/* 4 */
 /***/ (function(module, exports) {
 
 // shim for using process in browser
@@ -1334,7 +796,7 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 5 */
+/* 3 */
 /***/ (function(module, exports) {
 
 module.exports = function(module) {
@@ -1359,6 +821,381 @@ module.exports = function(module) {
 	}
 	return module;
 };
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// # Sea.js
+//
+let EventEmitter = __webpack_require__(1);
+let HashAddress = __webpack_require__(0);
+//let bion = require('bion');
+let sea = new EventEmitter();
+sea.net = new EventEmitter();
+let publicKey;
+module.exports = sea;
+
+var cons = {};
+
+main();
+var iceServers; // ##
+// Stun server list from https://gist.github.com/zziuni/3741933 
+iceServers = ['stun.l.google.com:19302', 'stun1.l.google.com:19302',
+           'stun2.l.google.com:19302', 'stun3.l.google.com:19302',
+           'stun4.l.google.com:19302', 'stun01.sipphone.com', 'stun.ekiga.net',
+           'stun.fwdnet.net', 'stun.ideasip.com', 'stun.iptel.org',
+           'stun.rixtelecom.se', 'stun.schlund.de', 'stunserver.org',
+           'stun.softjoys.com', 'stun.voiparound.com', 'stun.voipbuster.com',
+           'stun.voipstunt.com', 'stun.voxgratia.org', 'stun.xten.com'];
+iceServers = iceServers.map(s => ({url: 'stun:' + s}));
+function hashDist(s1, s2) { // ##
+  return HashAddress.fromHex(s1).dist(HashAddress.fromHex(s2));
+}
+
+let slice = (o, a, b) => Array.prototype.slice.call(o, a, b);
+let randomId = () => Math.random().toString(36).slice(2,10);
+let timeout = 5000;
+let findMin = (arr, f) => { // ##
+  arr = arr || [];
+  let min = arr[0];
+  for(let i = 1; i < arr.length; ++i) {
+    if(f(arr[i]) < f(min)) {
+      min = arr[i];
+    }
+  }
+  return min;
+}
+
+exportFn('call', call); // ##
+
+function call(dst, type) { // ##
+  let args = slice(arguments, 2);
+  console.log('call ' + type, dst, type, args, arguments);
+  return new Promise((resolve, reject) => {
+    let id = randomId();
+    sea.net.once(id, msg => msg.error ? reject(msg.error) : resolve(msg.data));
+    setTimeout(() => sea.net.emit(id, {error: 'timeout'}), timeout);
+    relay({dst, type, src: sea.id, srcType: id, data: args});
+  });
+}
+
+function exportFn(name, f) { // ##
+  sea.net.on(name, async (msg) => {
+    let response = { type: msg.srcType, dst: msg.src };
+    try {
+      response.data = await f.apply(f, msg.data);
+    } catch(e) {
+      response.error = String(e);
+    }
+    relay(response);
+  });
+}
+
+function relay(msg) { // ##
+  console.log('relay ' + msg.dst.slice(0,8) + ' ' + msg.type);
+  let con = findMin(Object.values(cons), o => hashDist(o.id, msg.dst));
+  if(hashDist(con.id, msg.dst) < hashDist(sea.id, msg.dst)) {
+    con.con.send(msg)
+  } else {
+    console.log('dropped', msg.type, msg.dst);
+  }
+}
+sea.on('connect:socket', (con, resolve) => { // ##
+  con.send({
+    type: 'helo',
+    id: sea.id,
+    peers: Object.keys(cons)
+  });
+  var id;
+  con.once('message', async (msg) => {
+    id = msg.id;
+    cons[id] = {
+      id: id, 
+      con: con, 
+      peers: msg.peers,
+      peerUpdate: Date.now(),
+    };
+    con.on('message', (msg) => {
+      if(sea.id === msg.dst || msg.runHere) {
+        sea.net.emit(msg.type, msg);
+      } else {
+        relay(msg);
+      }
+    });
+    console.log('Connected to ' + id);
+    if(resolve) {
+      resolve();
+    }
+  });
+  con.on('close', () => {
+    console.log('disconnect', id);
+    delete cons[id];
+  });
+});
+
+async function main() { // ##
+  await generateId();
+  if(self.node_modules) {
+    startWsServer();
+  } else {
+    let connected = false;
+    while(!connected) {
+      try {
+        await goOnline();
+        connected = true;
+      } catch(e) {
+        console.log('error', e);
+        await sleep(1000);
+      }
+    }
+  }
+}
+function connectVia(a, b) { // ##
+  console.log('connectVia', a, b, sea.id);
+  call(a, 'call', b, 'hello', 'abc');
+}
+exportFn('hello', (x) => console.log('hello ' + x));
+
+async function goOnline() { // ##
+  await connectToWs('ws://localhost:8888/');
+  let done = false;
+  //do {
+  let a = findMin(Object.keys(cons), o => hashDist(sea.id, o));
+  console.log('a', a);
+  let b = findMin(cons[a].peers,  o => hashDist(sea.id, o));
+  console.log('b', b);
+  if(!b || hashDist(sea.id, a) < hashDist(sea.id, b)) {
+    done = true;
+  } else {
+    await connectVia(a, b);
+  }
+  //  } while(!done);
+}
+
+async function generateId() { // ##
+  let key = await crypto.subtle.generateKey({
+    name: 'ECDSA', 
+    namedCurve: 'P-521'
+  }, true, ['sign', 'verify']);
+  publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
+  sea.id = (await HashAddress.generate(publicKey)).toHex();
+  sea.emit('ready');
+  console.log('My id: ' + sea.id);
+  if(self.info) {
+    self.info.innerHTML = sea.id;
+  }
+}
+
+function connectToWs(host) { // ##
+  return new Promise((resolve, reject) => {
+    let ws = new WebSocket(host);
+    ws.binaryType = 'arraybuffer';
+    let con = new EventEmitter();
+    con.send = (o) => ws.send(encode(o));
+    con.close = () => ws.close();
+    ws.addEventListener('message', (msg) => {
+      con.emit('message', decode(msg.data));
+    });
+    ws.addEventListener('open', (msg) => {
+      sea.emit('connect:socket', con, resolve);
+    });
+    ws.addEventListener('close', (msg) => {
+      con.emit('close');
+    });
+    ws.addEventListener('error', (msg) => {
+      reject(msg);
+    });
+  });
+}
+
+function startWsServer() { // ##
+  let server = node_modules.http.createServer();
+  let  wss = new node_modules.ws.Server({server: server});
+
+  let sockets = {};
+  wss.on('connection', (ws) => {
+    let con = new EventEmitter();
+    con.send = (o) => ws.send(encode(o));
+    con.close = (o) => ws.close();
+
+    sea.emit('connect:socket', con);
+    ws.on('message', (msg) => con.emit('message', decode(msg)));
+    ws.on('close', () => con.emit('close'));
+    ws.on('error', (e) => con.emit('error', e));
+  });
+
+  server.listen(8888, () => {
+    console.log('Started websocket server on port: ' + server.address().port);
+  });
+}
+
+// ## Utility functions
+function encode(obj) { // ###
+  //return bion.encode(obj).buffer;
+  return JSON.stringify(obj);
+}
+
+function decode(obj) { // ###
+  //return bion.decode(new Uint8Array(obj));
+  return JSON.parse(obj);
+}
+
+function sleep(ms) {// ###
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// # Old
+(async function() {
+
+
+  if(self.node_modules) {
+  } else { // isBrowser
+    setTimeout(browserMain, 200 + 200 * Math.random());
+  }
+
+  function print(s) {
+    document.body.innerHTML += s;
+  }
+
+  async function browserMainX() {
+    var ws = new WebSocket('ws://localhost:8888/');
+    ws.addEventListener('message', (msg) => {
+      console.log('message', msg);
+    });
+    ws.addEventListener('open', (msg) => {
+      ws.send(bion.encode({type: 'helo', data: 'me'}));
+      console.log('open', msg);
+    });
+    ws.addEventListener('close', (msg) => {
+      console.log('close', msg);
+    });
+    ws.addEventListener('error', (msg) => {
+      console.log('error', msg);
+    });
+  }
+  async function browserMain() {
+    console.log('browser');
+    var id;
+    var peerIds;
+    var ws = new WebSocket('ws://localhost:8888/');
+    ws.addEventListener('message', (msg) => {
+      msg = JSON.parse(msg.data);
+      console.log(msg);
+      switch(msg.mbox) {
+        case 'welcome':
+          id = msg.id;
+          peerIds = msg.peers;
+          print(`id: ${id}<br>`);
+          if(peerIds.length) {
+            connect();
+          }
+          break;
+        case 'ice':
+          connect(msg);
+          break;
+      }
+    });
+
+
+    var connections = self.cons = {};
+    var chans = self.chans = {};
+
+    function setupChan(chan, target) {
+      chan.onopen = (e) => {
+        console.log('onopen', e);
+        setTimeout(() => e.target.send('hello'), 500);
+      };
+      chan.onmessage = (e) => {
+        console.log('onmessage', e);
+      };
+      chan.onclose= (e) => {
+        console.log('onclose', e);
+      };
+      chans[target ] = chan;
+    }
+
+    function getCon(target, createChan) {
+      if(connections[target]) {
+        return connections[target];
+      }
+
+      var con = new RTCPeerConnection({ 'iceServers': iceServers });
+      con.ondatachannel = (e) => {
+        setupChan(e.channel);
+        console.log('ondatachannel', e);
+        e.channel.send('hi');
+      };
+      con.onicecandidate = (e) => {
+        if(e.candidate) {
+          ws.send(JSON.stringify({
+            src: id,
+            dst: target,
+            mbox: 'ice', 
+            ice: con.localDescription, 
+          }));
+        } else {
+        }
+        console.log('onicecandidata', e);
+      }
+      connections[target] = con;
+
+      if(createChan) {
+        var chan = con.createDataChannel("sendChannel", {
+          ordered: false
+        });
+        setupChan(chan, target);
+      }
+      return con;
+    }
+
+    async function connect(msg) {
+      console.log('connect', msg);
+      if(!msg) {
+        var con = getCon(peerIds[0], true);
+        var offer = await con.createOffer();
+        con.setLocalDescription(offer);
+
+      } else if(msg.ice) {
+        console.log('got ice', msg.ice);
+        var con = getCon(msg.src);
+        con.setRemoteDescription(new RTCSessionDescription(msg.ice));
+
+        if(msg.ice.type === 'offer') {
+          var answer = await con.createAnswer();
+          con.setLocalDescription(answer);
+        }
+      }
+    }
+  }
+});
+(async () => {
+
+  var CBOR;
+  // QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n
+  json = { 
+    "Data":"", 
+    "Links":[],
+  };
+  var cbor = CBOR.encode(json)
+    var ua = Array.from(new Uint8Array(cbor));
+  console.log(cbor.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+  var d1 = new Uint8Array(cbor.byteLength + 1);
+  console.log(d1, cbor);
+  d1[0] = 0x51;
+  d1.set(new Uint8Array(cbor), 1);
+  data = d1;
+  var ua = Array.from(new Uint8Array(data));
+  console.log('x', data.byteLength, String.fromCharCode.apply(null, ua), ua.map(o => o.toString(16)));
+  var hash = await crypto.subtle.digest('SHA-256', data);
+  console.log('hash', hash, hash.byteLength);
+  var ta = new Uint8Array(34);
+  ta[0] = 0x12;
+  ta[1] = 0x20;
+  ta.set(new Uint8Array(hash), 2);
+  console.log(ta, Base58.encode(ta), hash);
+})
 
 
 /***/ })
