@@ -838,6 +838,7 @@ let publicKey;
 module.exports = sea;
 
 var cons = {};
+var connecting = {};
 
 main();
 var iceServers; // ##
@@ -952,35 +953,47 @@ async function main() { // ##
     }
   }
 }
-async function connectVia(a, b) { // ##
-  var con = new RTCPeerConnection({ 'iceServers': iceServers });
-  console.log('con', con);
+async function connectVia(a, id) { // ##
+  let con = new RTCPeerConnection({ 'iceServers': iceServers });
   con.onicecandidate = (e) => {
-    console.log('ice-candidate');
-    if(e.candidate) {
-      call(a, 'call', b, 'webrtc-request', con.localDescription, sea.id);
-    }
     console.log('onicecandidata', e);
+    if(e.candidate) {
+    }
   }
-  /*
-  var con = getCon(peerIds[0], true);
-  */
-  var offer = await con.createOffer();
-  con.setLocalDescription(offer);
-  var chan = con.createDataChannel("sendChannel", {
-    ordered: false
-  });
+  let chan = con.createDataChannel("sendChannel", { ordered: false });
+  let offer = await con.createOffer();
+  await con.setLocalDescription(offer);
   con.ondatachannel = (e) => {
-    setupChan(e.channel);
     console.log('ondatachannel', e);
     e.channel.send('hi');
   };
-  console.log('connectVia', a, b, sea.id);
-  console.log(con, offer);
-  call(a, 'call', b, 'hello', 'abc');
-  //call(a, 'call', b, 'webrtc-offer');
+  con.onerror = (e) => {
+    console.log('err1', e);
+  }
+  let answer = await call(a, 'call', id, 'webrtc-offer', sea.id, con.localDescription);
+  console.log('got answer:', answer);
+  con.setRemoteDescription(answer);
+  connecting[id] = {id, con, offer, chan}
 }
-exportFn('hello', (x) => console.log('hello ' + x));
+exportFn('webrtc-offer', async (id, offer) => { // ##
+  console.log('webrtc-offer', id, offer);
+  con = new RTCPeerConnection();
+  con.ondatachannel = (o) => {
+    console.log('ondatachannel2', o);
+  };
+  con.onicecandidate = (o) => {
+    console.log('onicecandidate2', o);
+  };
+  con.onerror = (e) => {
+    console.log('err2', e);
+  }
+  await con.setRemoteDescription(offer);
+  let answer = await con.createAnswer();
+  con.setLocalDescription(answer);
+  console.log('answer', answer);
+  connecting[id] = { id, con, offer };
+  return answer;
+});
 
 async function goOnline() { // ##
   await connectToWs('ws://localhost:8888/');
