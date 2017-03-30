@@ -963,7 +963,7 @@ iceServers = ['stun.l.google.com:19302', 'stun1.l.google.com:19302',
 iceServers = iceServers.map(s => ({url: 'stun:' + s}));
 
 
-let sockets = {}
+let sockets = {} // ###
 async function connectVia(through, id) { // ###
 
   let con = new RTCPeerConnection({ 'iceServers': iceServers });
@@ -995,7 +995,8 @@ exportFn('webrtc-offer', async (through, id, offer) => { // ###
   }
 
   con.ondatachannel = (e) => {
-    addChanHandler(e.channel);
+    log('ondatachannel')
+    addChanHandler(e.channel, id);
   };
 
   con.onicecandidate = iceHandler(through, id);
@@ -1017,14 +1018,14 @@ exportFn('ice', (id, ice) => { // ###
 });
 
 function addChanHandler(chan, id) { // ###
+  log('chan', chan);
+
   chan.onmessage = (e) => log('msg', e.data);
   chan.onopen = () => {
-    this.sockets[id].connected = true;
-    this.sockets[id].chan = chan;
-    chan.send('hello');
-  }
-  if(chan.readyState === "open") {
-    chan.onopen();
+    log('chan open', id);
+    sockets[id].connected = true;
+    sockets[id].chan = chan;
+    setInterval(() => chan.send('hi from ' + sea.id.slice(0, 5)), 1000);
   }
 }
 
@@ -1063,7 +1064,7 @@ function exportFn(name, f) { // ###
 
 exportFn('call', call); // ###
 function relay(msg) { // ###
-  log('relay ' + msg.dst.slice(0,8) + ' ' + msg.type);
+  //log('relay ' + msg.dst.slice(0,8) + ' ' + msg.type);
   let con = findMin(Object.values(cons), o => hashDist(o.id, msg.dst));
   if(hashDist(con.id, msg.dst) < hashDist(sea.id, msg.dst)) {
     con.con.send(msg)
