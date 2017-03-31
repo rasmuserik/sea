@@ -850,7 +850,7 @@ function getConnection(id) { // ###
   if(!con) {
     con = new EventEmitter();
     con.outgoing = [];
-    con.send = (name, msg) => con.outgoing.push([name, msg]);
+    con.send = (msg) => con.outgoing.push(msg);
     con.id = id;
     con.pubKey = undefined;
     con.connected = false;
@@ -956,7 +956,7 @@ function startWsServer() { // ###
     con.send = (o) => ws.send(encode(o));
     con.close = (o) => ws.close();
 
-    sea.emit('connect:socket', con);
+    socketHandshake(con);
     ws.on('message', (msg) => con.emit('message', decode(msg)));
     ws.on('close', () => con.emit('close'));
     ws.on('error', (e) => con.emit('error', e));
@@ -978,7 +978,7 @@ function connectToWs(host) { // ###
       con.emit('message', decode(msg.data));
     });
     ws.addEventListener('open', (msg) => {
-      sea.emit('connect:socket', con, resolve);
+      socketHandshake(con, resolve);
     });
     ws.addEventListener('close', (msg) => {
       con.emit('close');
@@ -1081,13 +1081,13 @@ function call(dst, type) { // ###
     let id = randomId();
     sea.net.once(id, msg => msg.error ? reject(msg.error) : resolve(msg.data));
     setTimeout(() => sea.net.emit(id, {error: 'timeout'}), timeout);
-    relay({dst, type, src: sea.id, srcType: id, data: args});
+    relay({dst, type, reply: sea.id, replyType: id, data: args});
   });
 }
 
 function exportFn(name, f) { // ###
   sea.net.on(name, async (msg) => {
-    let response = { type: msg.srcType, dst: msg.src };
+    let response = { type: msg.replyType, dst: msg.reply};
     try {
       response.data = await f.apply(f, msg.data);
     } catch(e) {
@@ -1107,38 +1107,51 @@ function relay(msg) { // ###
     log('dropped', msg.type, msg.dst);
   }
 }
-sea.on('connect:socket', (con, resolve) => { // ###
-  con.send({
-    type: 'helo',
-    id: sea.id,
-    peers: getConnections()
-  });
-  var id;
-  con.once('message', async (msg) => {
-    id = msg.id;
-    let conObj = getConnection(id);
-    conObj.connected = true;
-    conObj.chan = con;
-    conObj.peers = msg.peers;
-    conObj.peerUpdate =  Date.now();
 
-    con.on('message', (msg) => {
-      if(sea.id === msg.dst || msg.runHere) {
+function socketHandshake(con, resolve) { // ###
+  var id;
+
+  var messageHandler;
+  var closeHandler;
+  handshake({
+    send: o => con.send(o),
+    onMessage: f => messageHandler = f,
+    onClose: f => closeHandler = f,
+    chan: con,
+    resolve,
+  });
+  con.on('message', (msg) => messageHandler(msg));
+  con.on('close', () => closeHandler());
+};
+
+function handshake({send, resolve, onMessage, onClose, chan}) { // ##
+  send({id: sea.id, peers: getConnections()});
+  var id;
+  onMessage(msg => {
+    id = msg.id;
+    let con = getConnection(id);
+    con.connected = true;
+    con.send = send;
+    con.chan = chan;
+    con.peers = msg.peers;
+    peerUpdate = Date.now();
+
+    onMessage(msg => {
+      if(sea.id === msg.dst) {
         sea.net.emit(msg.type, msg);
       } else {
         relay(msg);
       }
     });
-    log('Connected to ' + id);
     if(resolve) {
       resolve();
     }
   });
-  con.on('close', () => {
+  onClose(() => {
     log('disconnect', id);
     removeConnection(id);
   });
-});
+}
 
 // ## Main
 async function main() { // ###

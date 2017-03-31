@@ -49,14 +49,18 @@ Bootstrap servers are electron apps, which allows incoming connections by having
 
 ## Design/notes
 
+### Connecting
+
+1. Establish connection through websocket|webrtc
+2. Handshake
+   - emit {id: sea.id, peers: [id, id, id..]}
+   - receive {id...}
+3. Bind messages to be emitted on ws.net
+
 ### Data
 
-- connection (EventEmitter
+- connection
     - `id`
-    - emits
-        - `message`
-        - `disconnected`
-        - `connected`
     - `send(name, msg)`
     - `pubKey`
     - `outgoing` internal - buffer for sent messages before connected/sent.
