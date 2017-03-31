@@ -10,52 +10,6 @@ Sea will be built upon, and only run within, modern browser engines. The network
 Bootstrap servers are electron apps, which allows incoming connections by having an open secure websocket server. Otherwise they are identical to the other peers in the sea. Bootstrap servers are only used to make the initial connection. All other connections are created peer-to-peer through the sea.
 
 
-## Design/notes
-
-Levels:
-
-1. Only knows neighbourhood
-    - Level 1.0 - local
-    - Level 1.1 - Neighbour-callable
-2. Overlay network + routing, can send messages to any host
-
-Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
-
-### 1.0 functions
-
-- `connectVia`
-
-### 1.1 functions
-
-- `call` - proxy rpc to neighbour
-- `webrtc-offer` - handle webrtc-offer
-- `ice`
-
-
-
-### Connection data structure
-
-```yaml
-- id: "c2FtcGxl.."
-  connected: true
-  pubkey: "UHViS2V5..."
-  send: Function
-  on: event-handler: message
-  latency: 123
-  connections:
-    - id: "Rmlyc3Q...":
-      pubkey: "Zmlyc3Q..."
-      latency: 123
-    - id: "U2Vjb25k..."
-      pubkey: "c2Vjb25k..."
-      latency: 123
-```
-
-### Remote functions
-
-
-
-
 ## Roadmap / API
 
 - √ bion.encode/bion.decode (update solsort/bion)
@@ -93,7 +47,69 @@ Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
     - `chan.send(scope, obj)`
     - `chan.on(scope, (obj) => ..)`
 
-## Notes
+## Design/notes
+
+### Data
+
+- connection (EventEmitter
+    - `id`
+    - emits
+        - `message`
+        - `disconnected`
+        - `connected`
+    - `send(name, msg)`
+    - `pubKey`
+    - `outgoing` internal - buffer for sent messages before connected/sent.
+    - `con` internal
+    - `chan` internal
+    - `latency` internal
+    - `timestamp` internal
+    - `peers` list of peers
+        - `id`
+        - `pubKey`
+- message
+    - dst
+    - name
+    - src
+    - reply
+    - replyName
+    - data
+    - error
+
+### Levels
+Levels:
+
+1. Only knows neighbourhood
+    - Level 1.0 - local
+        - `connectVia`
+    - Level 1.1 - Neighbour-callable
+        - `call` - proxy rpc to neighbour
+        - `webrtc-offer` - handle webrtc-offer
+        - `ice`
+2. Overlay network + routing, can send messages to any host
+
+Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
+
+### Connection data structure
+
+```yaml
+- id: "c2FtcGxl.."
+  connected: true
+  pubkey: "UHViS2V5..."
+  send: Function
+  on: event-handler: message
+  latency: 123
+  connections:
+    - id: "Rmlyc3Q...":
+      pubkey: "Zmlyc3Q..."
+      latency: 123
+    - id: "U2Vjb25k..."
+      pubkey: "c2Vjb25k..."
+      latency: 123
+```
+
+
+### General Concepts
 
 Concepts:
 
