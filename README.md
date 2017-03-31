@@ -1,6 +1,5 @@
 # Sea
 
-The intention of sea is to be a core for building distributed web applications.
 The goal of Sea is become the distributed computing platform, running peer-to-peer in the webbrowser. 
 
 The initial use case is to make apps with pub-sub and connections, with no backend.
@@ -10,87 +9,48 @@ Sea will be built upon, and only run within, modern browser engines. The network
 Bootstrap servers are electron apps, which allows incoming connections by having an open secure websocket server. Otherwise they are identical to the other peers in the sea. Bootstrap servers are only used to make the initial connection. All other connections are created peer-to-peer through the sea.
 
 
+## Intended API
+
+***Under development***
+
+Public API:
+
+- `sea.addr(secret) →  addr` Public address, given a channel id.
+- `sea.send(addr, name, msg)` sends a message to a channel
+- `sea.secret` secret/channel-address for this node only. Join to receive messages.
+- `sea.join(secret) →  chan` connect/create/join a channel (notice, keeps connections open to other nodes in the channel, and regularly broadcast membership to the network, which takes some bandwidth)
+    - `chan.on(name, fn)` handle incoming messages. `sea.send(sea.addr(secret), name, msg)` end up at `sea.join(secret).on(name, fn)`
+    - `chan.leave()` disconnect from a channel.
+    - `chan.send(name, msg)` same as `sea.send(sea.addr(secret), name, msg)`
+    - `chan.exportFn(name, fn)` same as `chan.on` + send result possibly async fn to `{dst: msg.reply, name: msg.replyName, ...}`
+- `sea.call(addr, name, msg) →  Promise` - same as create a temporary endpoint with a `random_name` on `sea.secret` and send `{reply: local.id, replyName: random_name, ...msg}`.
+- `sea.id` - same as to `sea.addr(sea.secret)`
+
+Public message properties:
+
+- `name` target mailbox
+- `dst` target address
+- `src` original sender
+- `ts` sending timestamp for message, based on local estimated/median clock.
+- `data` actual data
+- `error` error
+- `reply` address to reply to
+- `replyName` name/mailbox to reply to
+- `multicast` true if the message should be send to all nodes in the channel
+
 ## Roadmap / API
 
-- √ bion.encode/bion.decode (update solsort/bion)
-- √ HashAddresses
-- Connect to Sea
-    - `sea = require('peersea')  →   ()`
-    - `sea.localId()  →   addr`
-    - `sea.connections()  →   Array(addr..)`
-    - `sea.goOnline([bootstrapServer])  →   Promise()`
-    - `sea.goOffline()  →   Promise()` 
-    - `sea.online()  →   Boolean`
-    - `sea.on('online', () => ..)  →   ()`
-    - `sea.on('offline', () => ..)  →   ()`
-- RPC to any node in the network (for making connections etc.)
-    - `sea.handle(scope, (args..) => Promise(..))`
-    - `sea.call(addr, scope, args..)  →   Promise(..)`
-    - `sea.call(addr, 'sea:nearest', addr)  →   Promise(addr)`
-- Direct communication between peers
-    - `sea.connect(remoteId : addr)  →   con`
-    - `sea.on('connection', (con) => ..)  →   ()`
-    - `con.remoteId()  →   addr` 
-    - `con.disconnect()  →   ()`
-    - `con.connected()  →   Boolean`
-    - `con.on('connect', () => ..)  →   ()`
-    - `con.on('disconnect', () => ..)  →   ()`
-    - `con.send(scope, obj)  →   ()`
-    - `con.on(scope, (obj) => ..)  →   ()`
-- Pubsub
-    - `sea.join(channelId)  →   chan`
-    - `chan.channelId()`  →   `String` 
-    - `chan.disconnect()`
-    - `chan.connected()  →   Boolean`
-    - `chan.on('connect', () => ..)`
-    - `chan.on('disconnect', () => ..)`
-    - `chan.send(scope, obj)`
-    - `chan.on(scope, (obj) => ..)`
+- √Websocket bootstrap gateway
+- √Establish webrtc through neighbours
+- Propagate connection state to neighbours
+- Iteratively connect to nodes nearest to routing points.
+- Routing across network
+- Tagging / DHT with short TTL, and nodes as values
+- Multicast
 
-## Design/notes
-
-### Connecting
-
-1. Establish connection through websocket|webrtc
-2. Handshake
-   - emit {id: sea.id, peers: [id, id, id..]}
-   - receive {id...}
-3. Bind messages to be emitted on ws.net
-
-### Data
-
-- connection
-    - `id`
-    - `send(name, msg)`
-    - `pubKey`
-    - `outgoing` internal - buffer for sent messages before connected/sent.
-    - `con` internal
-    - `chan` internal
-    - `latency` internal
-    - `timestamp` internal
-    - `peers` list of peers
-        - `id`
-        - `pubKey`
-- message
-    - dst
-    - name
-    - src
-    - reply
-    - replyName
-    - data
-    - error
-
-### Levels
-Levels:
-
-1. Only knows neighbourhood
-    - Level 1.0 - local
-        - `connectVia`
-    - Level 1.1 - Neighbour-callable
-        - `call` - proxy rpc to neighbour
-        - `webrtc-offer` - handle webrtc-offer
-        - `ice`
-2. Overlay network + routing, can send messages to any host
+Menial tasks
+- refactor addresses to be base64 strings.
+- apply handshake on webrtc connections.
 
 Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
 
