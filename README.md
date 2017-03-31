@@ -21,10 +21,12 @@ Public API:
 - `sea.join(secret) →  chan` connect/create/join a channel (notice, keeps connections open to other nodes in the channel, and regularly broadcast membership to the network, which takes some bandwidth)
     - `chan.on(name, fn)` handle incoming messages. `sea.send(sea.addr(secret), name, msg)` end up at `sea.join(secret).on(name, fn)`
     - `chan.leave()` disconnect from a channel.
+    - `chan.rejoin()` reconnect to channel after leave has been called.
     - `chan.send(name, msg)` same as `sea.send(sea.addr(secret), name, msg)`
     - `chan.exportFn(name, fn)` same as `chan.on` + send result possibly async fn to `{dst: msg.reply, name: msg.replyName, ...}`
-- `sea.call(addr, name, msg) →  Promise` - same as create a temporary endpoint with a `random_name` on `sea.secret` and send `{reply: local.id, replyName: random_name, ...msg}`.
+- `sea.call(addr, name, msg) →  Promise` - same as create a temporary endpoint with a `random_name` on `sea.incoming` and send `{reply: local.id, replyName: random_name, ...msg}`.
 - `sea.id` - same as to `sea.addr(sea.secret)`
+- `sea.incoming` - result of `sea.join(sea.secret)`
 
 Public message properties:
 
@@ -47,6 +49,7 @@ Public message properties:
 - Routing across network
 - Tagging / DHT with short TTL, and nodes as values
 - Multicast
+- Keep track of number open channels, and disconnect from network if they reach zero / reconnect if above zero.
 
 Menial tasks
 - refactor addresses to be base64 strings.
