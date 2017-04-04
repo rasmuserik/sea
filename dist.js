@@ -560,6 +560,64 @@ function isUndefined(arg) {
 // - `replyName` name/mailbox to reply to
 // - `multicast` true if the message should be send to all nodes in the channel
 // 
+// # Tasks / notes
+//
+// - use designed api
+// - expand connections
+// - Make webrtc work in firefox (new ... instead of js-object for ice)
+//
+// ## Changelog
+// ## Roadmap / API
+// 
+// - √Websocket bootstrap gateway
+// - √Establish webrtc through neighbours
+// - Propagate connection state to neighbours
+// - Iteratively connect to nodes nearest to routing points.
+// - Routing across network
+// - Tagging / DHT with short TTL, and nodes as values
+// - Multicast
+// - Keep track of number open channels, and disconnect from network if they reach zero / reconnect if above zero.
+// 
+// Menial tasks
+// - refactor addresses to be base64 strings.
+// - apply handshake on webrtc connections.
+// 
+// Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
+// 
+// ## Connection data structure
+// 
+// ```yaml
+// - id: "c2FtcGxl.."
+//   connected: true
+//   pubkey: "UHViS2V5..."
+//   send: Function
+//   on: event-handler: message
+//   latency: 123
+//   connections:
+//     - id: "Rmlyc3Q...":
+//       pubkey: "Zmlyc3Q..."
+//       latency: 123
+//     - id: "U2Vjb25k..."
+//       pubkey: "c2Vjb25k..."
+//       latency: 123
+// ```
+// 
+// 
+// ## General Concepts
+// 
+// Concepts:
+// 
+// - An *entity* has a balance of credit to/from other entities, and is able to add a verifiable signature to data.
+// - A *node* is a computer(webbrowser/server/smartphone/...) connected to other nodes in the *sea*. A node is a computational *entity*, and can make sigatures via public/private-key cryptography. A node has resources: storage, network, computing power, - and can deliver this as services to other entities. Services can be paid by updating the credit balance between the entities.
+// - The *sea* is the entire network of online connected nodes.
+// 
+// Long term vision:
+// 
+// - sharing/market of computing resources
+// - economic system
+// - shared "clock" with a "tick" each ~10 sec / blockchain with list of all peers, and common accounting
+//     - secure computations / contracts running on top of the blockchain.
+//     - storage within the sea
 // # Sea.js
 //
 let EventEmitter = __webpack_require__(1);
@@ -665,7 +723,6 @@ function nearestConnection(adr) { // ###
 // ## Utility functions
 function log() { // ###
   let s = str(slice(arguments))
-  //console.log(s);
   console.log.apply(console, arguments);
   if(typeof document !== 'undefined') {
     let elem = document.getElementById('info');
@@ -700,12 +757,10 @@ function findMin(arr, f) { // ###
 }
 
 function encode(obj) { // ###
-  //return bion.encode(obj).buffer;
   return JSON.stringify(obj);
 }
 
 function decode(obj) { // ###
-  //return bion.decode(new Uint8Array(obj));
   return JSON.parse(obj);
 }
 
@@ -774,7 +829,9 @@ function connectToWs(host) { // ###
 
 // ## WebRTC Connections
 var iceServers; // ###
+
 // Stun server list from https://gist.github.com/zziuni/3741933 
+
 iceServers = ['stun.l.google.com:19302', 'stun1.l.google.com:19302',
   'stun2.l.google.com:19302', 'stun3.l.google.com:19302',
   'stun4.l.google.com:19302', 'stun01.sipphone.com', 'stun.ekiga.net',
@@ -855,7 +912,9 @@ function iceHandler(through, id) { // ###
     }
   }
 }
+
 // ## General communication structure
+
 function call(dst, type) { // ###
   let args = slice(arguments, 2);
   log('call ' + type, dst, type, args, arguments);
@@ -910,6 +969,7 @@ function handshake({send, resolve, onMessage, onClose}) { // ###
 }
 
 // ## Main
+
 async function main() { // ###
   sea.id = await generateId();
   log('My id: ' + sea.id);
@@ -932,7 +992,9 @@ async function main() { // ###
 async function goOnline() { // ###
   await connectToWs('ws://localhost:8888/');
   let done = false;
+
   //do {
+  //
   let a = findMin(getConnections(), o => hashDist(sea.id, o));
   log(getConnections());
   log('a', a);
@@ -945,61 +1007,11 @@ async function goOnline() { // ###
     log('connectVia', a.slice(0,5), b.slice(0,5));
     await connectVia(a, b);
   }
+
   //  } while(!done);
+  //
 }
 
-// # Notes
-// ## Roadmap / API
-// 
-// - √Websocket bootstrap gateway
-// - √Establish webrtc through neighbours
-// - Propagate connection state to neighbours
-// - Iteratively connect to nodes nearest to routing points.
-// - Routing across network
-// - Tagging / DHT with short TTL, and nodes as values
-// - Multicast
-// - Keep track of number open channels, and disconnect from network if they reach zero / reconnect if above zero.
-// 
-// Menial tasks
-// - refactor addresses to be base64 strings.
-// - apply handshake on webrtc connections.
-// 
-// Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
-// 
-// ## Connection data structure
-// 
-// ```yaml
-// - id: "c2FtcGxl.."
-//   connected: true
-//   pubkey: "UHViS2V5..."
-//   send: Function
-//   on: event-handler: message
-//   latency: 123
-//   connections:
-//     - id: "Rmlyc3Q...":
-//       pubkey: "Zmlyc3Q..."
-//       latency: 123
-//     - id: "U2Vjb25k..."
-//       pubkey: "c2Vjb25k..."
-//       latency: 123
-// ```
-// 
-// 
-// ## General Concepts
-// 
-// Concepts:
-// 
-// - An *entity* has a balance of credit to/from other entities, and is able to add a verifiable signature to data.
-// - A *node* is a computer(webbrowser/server/smartphone/...) connected to other nodes in the *sea*. A node is a computational *entity*, and can make sigatures via public/private-key cryptography. A node has resources: storage, network, computing power, - and can deliver this as services to other entities. Services can be paid by updating the credit balance between the entities.
-// - The *sea* is the entire network of online connected nodes.
-// 
-// Long term vision:
-// 
-// - sharing/market of computing resources
-// - economic system
-// - shared "clock" with a "tick" each ~10 sec / blockchain with list of all peers, and common accounting
-//     - secure computations / contracts running on top of the blockchain.
-//     - storage within the sea
 
 
 /***/ })
