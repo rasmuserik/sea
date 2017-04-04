@@ -63,16 +63,108 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 4);
+/******/ 	return __webpack_require__(__webpack_require__.s = 2);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(module, process) {/*
- * Hashes as addresses, and utility functions for Kademlia-like routing.
- */
+// Hashes as addresses, and utility functions for Kademlia-like routing.
+//
+
+let length = 96/6;
+let tests = {};
+// # Base64 alphabet
+let base64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+tests.TEST_base64 = () => {
+  base64[63] === '/' || throwError();
+}
+
+async function hashAddress(src) { // #
+  if(typeof src === 'string') {
+    src = ascii2buf(src);
+  }
+  let hash = await crypto.subtle.digest('SHA-256', src);
+  return btoa(buf2ascii(new Uint8Array(hash))).slice(0,length);
+}
+tests.TEST_hashAddress = async () => {
+  (await hashAddress('hello')) === 'LPJNul+wow4m6Dsq' || throwError();
+}
+
+// # `dist(a,b)`
+//
+// Calculate xor-distance between two base64 addresses.
+//
+function dist(a, b) {
+  let len = Math.min(a.length, b.length);
+  let dist = 0;
+  let i = 0;
+  for(;;) {
+    va = base64.indexOf(a[i]);
+    vb = base64.indexOf(b[i]);
+    if(va === -1 || vb === -1) {
+      return dist;
+    }
+    dist += (va ^ vb) * (2 ** (-5 - 6*i));
+    ++i;
+  }
+}
+tests.TEST_distBit = () => {
+  dist('Abracadabra', 'Abracadabra') === 0 || throwError();
+  dist('A', 'B') ===  2 ** -5 || throwError();
+}
+
+// # `distBit(a,b)`
+//
+// Get the position of the first bit that differs in a,b. This is logarithmic xor-distance.
+//
+function distBit(a, b) {
+  return Math.ceil(Math.log(1/dist(a,b)) / Math.log(2));
+}
+tests.TEST_distBit = () => {
+  distBit('A', base64[32]) === 0 || throwError();
+  distBit('A', base64[31]) === 1 || throwError();
+  distBit('AA', 'A/') === 6 || throwError();
+  distBit('A', 'A') === Infinity || throwError();
+}
+
+// # `flipBitAndRandom(addr, bitpos)`
+//
+// Create a new address, preserving the first `bitpos - 1` bits, the bit at `bitpos` is flipped, and the rest of the bits are random.
+//
+function flipBitAndRandom(addr, bitpos) {
+  let result = addr.slice(0, bitpos / 6 | 0);
+
+  let word = base64.indexOf(addr[bitpos / 6 | 0]);
+  if(word === -1) {
+    word = 0;
+  }
+  let flipBits = 64 + (Math.random() * 64) >> ((bitpos % 6) + 1);
+  word = word ^ flipBits;
+  result += base64[word];
+
+  for(let i = (bitpos / 6)+1 | 0; i < length; ++i) {
+    result += base64[Math.random() * 64 | 0];
+  }
+
+  return result;
+}
+tests.TEST_flipBitAndRandom = () => {
+  flipBitAndRandom('AAAAAA', 11).startsWith('AB') || throwError();
+  flipBitAndRandom('//////', 17).startsWith('//+') || throwError();
+  flipBitAndRandom('A', 6).startsWith('A') || throwError();
+  flipBitAndRandom('B', 5).startsWith('A') || throwError();
+  for(let i = 0; i < 10; ++i) {
+    "CD".indexOf(flipBitAndRandom('A', 4)[0]) !== -1 || throwError();
+    "EFGH".indexOf(flipBitAndRandom('A', 3)[0]) !== -1 || throwError();
+  }
+}
+
+for(let k in tests) {
+  tests[k]();
+}
+
 class HashAddress { // #
 
   constructor(o) { // ##
@@ -169,9 +261,9 @@ class HashAddress { // #
       if(a[i] !== b[i]) {
         return (2 ** (93 - i*8)) *
           (((a[i] ^ b[i]) << 23) |
-          ((a[i + 1] ^ b[i + 1]) << 15) |
-          ((a[i + 2] ^ b[i + 2]) << 7) |
-          ((a[i + 3] ^ b[i + 3]) >> 1));
+            ((a[i + 1] ^ b[i + 1]) << 15) |
+            ((a[i + 2] ^ b[i + 2]) << 7) |
+            ((a[i + 3] ^ b[i + 3]) >> 1));
       }
     }
     return 0;
@@ -238,8 +330,15 @@ class HashAddress { // #
     zero.flipBitRandomise(7).toHex().startsWith('01') || throwError();
     zero.flipBitRandomise(7+8).toHex().startsWith('0001') || throwError();
   }
-}
 
+}
+// # Exports
+
+if(true) {
+  exports.HashAddress = HashAddress;
+  exports.hashAddress = hashAddress;
+  exports.TESTS = tests;
+}
 
 // # Utility functions
 
@@ -275,31 +374,6 @@ function throwError(msg) { // ##
   throw new Error(msg);
 }
 
-// # Export + testrunner
-(()=>{
-  let runTest = (cls) => Promise.all(
-      Object.getOwnPropertyNames(HashAddress)
-      .filter(k => k.startsWith('TEST_'))
-      .map(k => (console.log(k), k))
-      .map(k => HashAddress[k]())
-      .map(v => Promise.resolve(v)));
-
-  if(true) {
-    module.exports = HashAddress;
-    if(__webpack_require__.c[__webpack_require__.s] === module) {
-      runTest(HashAddress)
-        .then(() => process.exit(0))
-        .catch(e => {
-          console.log(e);
-          process.exit(0);
-        });
-    }
-  } else if(typeof RUNTEST_hashaddress !== 'undefind') {
-    runTest(HashAddress);
-  }
-})()
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)(module), __webpack_require__(2)))
 
 /***/ }),
 /* 1 */
@@ -611,226 +685,12 @@ function isUndefined(arg) {
 
 /***/ }),
 /* 2 */
-/***/ (function(module, exports) {
-
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports) {
-
-module.exports = function(module) {
-	if(!module.webpackPolyfill) {
-		module.deprecate = function() {};
-		module.paths = [];
-		// module.parent = undefined by default
-		if(!module.children) module.children = [];
-		Object.defineProperty(module, "loaded", {
-			enumerable: true,
-			get: function() {
-				return module.l;
-			}
-		});
-		Object.defineProperty(module, "id", {
-			enumerable: true,
-			get: function() {
-				return module.i;
-			}
-		});
-		module.webpackPolyfill = 1;
-	}
-	return module;
-};
-
-
-/***/ }),
-/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // # Sea.js
 //
 let EventEmitter = __webpack_require__(1);
-let HashAddress = __webpack_require__(0);
+let {HashAddress} = __webpack_require__(0);
 //let bion = require('bion');
 let sea = new EventEmitter();
 sea.net = new EventEmitter();
@@ -1106,7 +966,7 @@ function relay(msg) { // ###
 }
 
 
-function handshake({send, resolve, onMessage, onClose}) { // ##
+function handshake({send, resolve, onMessage, onClose}) { // ###
   send({id: sea.id, peers: getConnections()});
   var id;
   onMessage(msg => {

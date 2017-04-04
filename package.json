@@ -24,6 +24,7 @@
   "homepage": "https://sea.solsort.com/",
   "dependencies": {
     "bion": "^0.2.2",
+    "hashaddress": "0.0.5",
     "wolfy87-eventemitter": "^5.1.0",
     "ws": "^2.2.0"
   },
