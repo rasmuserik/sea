@@ -337,6 +337,9 @@ class HashAddress { // #
 if(true) {
   exports.HashAddress = HashAddress;
   exports.hashAddress = hashAddress;
+  exports.dist = dist;
+  exports.distBit = distBit;
+  exports.flipBitAndRandom = flipBitAndRandom;
   exports.TESTS = tests;
 }
 
@@ -690,7 +693,7 @@ function isUndefined(arg) {
 // # Sea.js
 //
 let EventEmitter = __webpack_require__(1);
-let {HashAddress} = __webpack_require__(0);
+let {HashAddress, dist, hashAddress} = __webpack_require__(0);
 //let bion = require('bion');
 let sea = new EventEmitter();
 sea.net = new EventEmitter();
@@ -757,7 +760,8 @@ function log() { // ###
 
 main();
 function hashDist(s1, s2) { // ###
-  return HashAddress.fromHex(s1).dist(HashAddress.fromHex(s2));
+  console.log(s1, s2, dist(s1, s2));
+  return dist(s1, s2);
 }
 
 function slice(o, a, b) { return Array.prototype.slice.call(o, a, b); }
@@ -802,7 +806,7 @@ async function generateId() { // ###
     namedCurve: 'P-521'
   }, true, ['sign', 'verify']);
   publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
-  return (await HashAddress.generate(publicKey)).toHex();
+  return await hashAddress(publicKey);
 }
 
 // ## WebSocket connections
