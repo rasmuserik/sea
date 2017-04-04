@@ -2,7 +2,7 @@
   "name": "peersea",
   "version": "0.0.1",
   "description": "",
-  "main": "lib/sea.js",
+  "main": "sea.js",
   "browser": "dist.js",
   "scripts": {
     "build": "webpack",
