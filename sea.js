@@ -13,22 +13,26 @@
 // 
 // ***Under development***
 // 
-// Public API:
+// ### Public API:
 // 
-// - async `sea.addr(key) →  addr` Public address, given a channel id.
-// - `sea.send(addr, name, msg)` sends a message to a channel
-// - `sea.secret` secret/channel-address for this node only. Join to receive messages.
-// - async `sea.join(key) →  chan` connect/create/join a channel (notice, keeps connections open to other nodes in the channel, and regularly broadcast membership to the network, which takes some bandwidth)
+// - addresses
+//     - `sea.addr(key) →  Promise(addr)` Public address, given a channel id.
+//     - `sea.id` - the address of this node
+// - emitting messages
+//     - `sea.sendAll(addr, name, msg)` sends a message multicast to a channel
+//     - `sea.sendAny(addr, name, msg)` sends a message anycast to a channel
+//     - `sea.call(addr, name, msg) →  Promise` - same as create a temporary endpoint with a `random_name` on `sea.incoming` and then sendAny `{reply: local.id, replyName: random_name, ...msg}`.
+// - channels
+//     - `sea.join(key) →  Promise(Chan)` connect/create/join a channel (notice, keeps connections open to other nodes in the channel, and regularly broadcast membership to the network, which takes some bandwidth)
+//     - `sea.incoming` - channel for local node. Messages sent to `sea.id` can be received here.
+// - methods on `Chan` objects (extends EventEmitter):
 //     - `chan.on(name, fn)` handle incoming messages. `sea.send(sea.addr(key), name, msg)` end up at `sea.join(key).on(name, fn)`
 //     - `chan.leave()` disconnect from a channel.
 //     - `chan.rejoin()` reconnect to channel after leave has been called.
 //     - `chan.send(name, msg)` same as `sea.send(sea.addr(key), name, msg)`
 //     - `chan.exportFn(name, fn)` same as `chan.on` + send result possibly async fn to `{dst: msg.reply, name: msg.replyName, ...}`
-// - `sea.call(addr, name, msg) →  Promise` - same as create a temporary endpoint with a `random_name` on `sea.incoming` and send `{reply: local.id, replyName: random_name, ...msg}`.
-// - `sea.id` - same as to `sea.addr(sea.ke)`
-// - `sea.incoming` - channel for local node. Messages sent to `sea.id` can be received here.
 // 
-// Public message properties:
+// Message properties:
 // 
 // - `name` target mailbox
 // - `dst` target address
@@ -40,6 +44,10 @@
 // - `replyName` name/mailbox to reply to
 // - `multicast` true if the message should be send to all nodes in the channel
 // 
+// ### Private
+//
+// - `sea.secret` secret/channel-address for this node only. Join to receive messages.
+// - `sea.connections` - list of current connections
 // # Tasks / notes
 //
 // - use designed api
@@ -104,8 +112,6 @@ let EventEmitter = require('events');
 let {dist, hashAddress} = require('hashaddress');
 //let bion = require('bion');
 let sea = new EventEmitter();
-sea.net = new EventEmitter();
-let publicKey;
 module.exports = sea;
 
 // ## Public API
@@ -115,6 +121,7 @@ sea.id = undefined; // generated from main()
 
 class Chan extends EventEmitter {
   constructor(key, id) {
+    super();
     this.key = key;
     this.id = id;
     this.refs = 0;
@@ -156,11 +163,13 @@ sea.join = async function(key) {
   ++chans.refs;
 }
 
+sea.incoming = new Chan();
+
 // ## Private API methods
 
 sea.chans = {};
 // ## Connections
-var connections = window.connections = [];
+var connections = sea.connections = [];
 function getConnections() { // ###
   return connections
     .filter(o => o.connected)
@@ -256,14 +265,6 @@ function str(o) { // ###
   }
 }
 
-async function generateId() { // ###
-  let key = await crypto.subtle.generateKey({
-    name: 'ECDSA', 
-    namedCurve: 'P-521'
-  }, true, ['sign', 'verify']);
-  publicKey = await crypto.subtle.exportKey('spki', key.publicKey);
-  return await hashAddress(publicKey);
-}
 
 // ## WebSocket connections
 function startWsServer() { // ###
@@ -400,14 +401,14 @@ function call(dst, type) { // ###
   log('call ' + type, dst, type, args, arguments);
   return new Promise((resolve, reject) => {
     let id = randomId();
-    sea.net.once(id, msg => msg.error ? reject(msg.error) : resolve(msg.data));
-    setTimeout(() => sea.net.emit(id, {error: 'timeout'}), timeout);
+    sea.incoming.once(id, msg => msg.error ? reject(msg.error) : resolve(msg.data));
+    setTimeout(() => sea.incoming.emit(id, {error: 'timeout'}), timeout);
     relay({dst, type, reply: sea.id, replyType: id, data: args});
   });
 }
 
 function exportFn(name, f) { // ###
-  sea.net.on(name, async (msg) => {
+  sea.incoming.on(name, async (msg) => {
     let response = { type: msg.replyType, dst: msg.reply};
     try {
       response.data = await f.apply(f, msg.data);
@@ -439,7 +440,7 @@ function handshake({send, resolve, onMessage, onClose}) { // ###
     con.connected = true;
     con.send = send;
     con.peers = msg.peers;
-    onMessage(msg => sea.id === msg.dst ? sea.net.emit(msg.type, msg) : relay(msg));
+    onMessage(msg => sea.id === msg.dst ? sea.incoming.emit(msg.type, msg) : relay(msg));
     if(resolve) resolve();
   });
   onClose(() => {
@@ -451,9 +452,16 @@ function handshake({send, resolve, onMessage, onClose}) { // ###
 // ## Main
 
 async function main() { // ###
-  sea.id = await generateId();
+
+  let key = await crypto.subtle.generateKey({
+    name: 'ECDSA', 
+    namedCurve: 'P-521'
+  }, true, ['sign', 'verify']);
+  sea.publicKey = sea.incoming.key = await crypto.subtle.exportKey('spki', key.publicKey);
+  sea.id = sea.incoming.id = await hashAddress(sea.publicKey);
+
   log('My id: ' + sea.id);
-  await generateId();
+
   if(self.node_modules) {
     startWsServer();
   } else {
