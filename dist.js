@@ -520,7 +520,7 @@ function isUndefined(arg) {
 
 // # Sea
 // 
-// The goal of Sea is become the distributed computing platform, running peer-to-peer in the webbrowser. 
+// The goal of Sea is to become the distributed computing platform, running peer-to-peer in the webbrowser. 
 // 
 // The initial use case is to make apps with pub-sub and connections, with no backend.
 // 
@@ -590,7 +590,7 @@ function isUndefined(arg) {
 // - refactor addresses to be base64 strings.
 // - apply handshake on webrtc connections.
 // 
-// Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain
+// Later: Economic system, DHT, Groups / broadcast, ticktock, Blockchain, simple php bootstrap
 // 
 // ## Connection data structure
 // 
@@ -630,63 +630,67 @@ function isUndefined(arg) {
 //
 let EventEmitter = __webpack_require__(1);
 let {dist, hashAddress} = __webpack_require__(0);
-//let bion = require('bion');
 let sea = new EventEmitter();
 module.exports = sea;
 
 // ## Public API
 // 
-sea.addr = hashAddress;
-sea.id = undefined; // generated from main()
-
-class Chan extends EventEmitter {
-  constructor(key, id) {
+sea.addr = hashAddress; // ###
+sea.id = undefined; // ### generated from main()
+class Chan extends EventEmitter { // ###
+  constructor(key, id) { // ####
     super();
     this.key = key;
     this.id = id;
     this.refs = 0;
   }
-  leave() {
+  leave() { // ####
     --this.refs;
   }
-  rejoin() {
+  rejoin() { // ####
     ++this.refs;
   }
-  sendAny(name, msg) {
+  sendAny(name, msg) { // ####
     sea.sendAny(this.id, name, msg);
   }
-  sendAll(name, msg) {
+  sendAll(name, msg) { // ####
     sea.sendAll(this.id, name, msg);
   }
-  exportFn(name, fn) {
-    this.on(name, async function(msg) {
-      if(msg.reply && msg.replyName) {
-        let o = {
-          dst: msg.reply,
-          name: msg.replyName
-        };
-        try {
-          o.data = await Promise.resolve(fn.apply(null, msg.data));
-        } catch(e) {
-          o.error = e;
-        }
-        sea.relay(o);
-      } else {
-        fn.apply(null, msg.data);
+  exportFn(name, f) { // ####
+    this.on(name, async (msg) => {
+      let response = { type: msg.replyType, dst: msg.reply};
+      try {
+        response.data = await Promise.resolve(f.apply(f, msg.data));
+      } catch(e) {
+        response.error = String(e);
       }
+      relay(response);
     });
   }
 }
 
-sea.join = async function(key) {
+sea.join = async function(key) { // ###
   let chan = sea.chans[key] || new chan(key, await sea.addr(key));
   ++chans.refs;
 }
 
-sea.incoming = new Chan();
+sea.incoming = new Chan(); // ###
+
+sea.call = function call(dst, type) { // ###
+  let args = slice(arguments, 2);
+  log('call ' + type, dst, type, args, arguments);
+  return new Promise((resolve, reject) => {
+    let id = randomId();
+    sea.incoming.once(id, msg => msg.error ? reject(msg.error) : resolve(msg.data));
+    setTimeout(() => sea.incoming.emit(id, {error: 'timeout'}), timeout);
+    relay({dst, type, reply: sea.id, replyType: id, data: args});
+  });
+}
+
 
 // ## Private API methods
 
+sea.incoming.exportFn('call', sea.call); // ###
 sea.chans = {};
 // ## Connections
 var connections = sea.connections = [];
@@ -829,6 +833,7 @@ function connectToWs(host) { // ###
 }
 
 // ## WebRTC Connections
+//
 var iceServers; // ###
 
 // Stun server list from https://gist.github.com/zziuni/3741933 
@@ -841,7 +846,6 @@ iceServers = ['stun.l.google.com:19302', 'stun1.l.google.com:19302',
   'stun.softjoys.com', 'stun.voiparound.com', 'stun.voipbuster.com',
   'stun.voipstunt.com', 'stun.voxgratia.org', 'stun.xten.com'];
 iceServers = iceServers.map(s => ({url: 'stun:' + s}));
-
 
 async function connectVia(through, id) { // ###
 
@@ -857,44 +861,41 @@ async function connectVia(through, id) { // ###
   let offer = await con.createOffer();
   await con.setLocalDescription(offer);
 
-  let answer = await call(through, 'call', 
+  let answer = await sea.call(through, 'call', 
     id, 'webrtc-offer', through, sea.id, con.localDescription);
   log('got answer:', answer);
   con.setRemoteDescription(answer);
 }
+sea.incoming.exportFn('webrtc-offer', // ###
+  async (through, id, offer) => { 
+    log('webrtc-offer', id, offer);
+    con = new RTCPeerConnection();
 
-exportFn('webrtc-offer', async (through, id, offer) => { // ###
-  log('webrtc-offer', id, offer);
-  con = new RTCPeerConnection();
+    getConnection(id).con = con;
 
-  getConnection(id).con = con;
+    con.ondatachannel = (e) => {
+      log('ondatachannel')
+      addChanHandler(e.channel, id);
+    };
 
-  con.ondatachannel = (e) => {
-    log('ondatachannel')
-    addChanHandler(e.channel, id);
-  };
+    con.onicecandidate = iceHandler(through, id);
+    con.onerror = log;
 
-  con.onicecandidate = iceHandler(through, id);
-  con.onerror = log;
-
-  await con.setRemoteDescription(offer);
-  let answer = await con.createAnswer();
-  con.setLocalDescription(answer);
-  return answer;
-});
-
-
-exportFn('ice', (id, ice) => { // ###
-  log('addIce', id.slice(0, 5), getConnection(id))
-  if(!getConnection(id).connected) {
-    getConnection(id).con.addIceCandidate(ice);
-  }
-  log('ice', id, ice);
-});
-
+    await con.setRemoteDescription(offer);
+    let answer = await con.createAnswer();
+    con.setLocalDescription(answer);
+    return answer;
+  });
+sea.incoming.exportFn('ice', // ###
+  (id, ice) => {
+    log('addIce', id.slice(0, 5), getConnection(id))
+    if(!getConnection(id).connected) {
+      getConnection(id).con.addIceCandidate(ice);
+    }
+    log('ice', id, ice);
+  });
 function addChanHandler(chan, id) { // ###
   log('chan', chan);
-
   chan.onmessage = (e) => log('msg', e.data);
   chan.onopen = () => {
     log('chan open', id);
@@ -903,45 +904,19 @@ function addChanHandler(chan, id) { // ###
     setInterval(() => chan.send('hi from ' + sea.id.slice(0, 5)), 1000);
   }
 }
-
 function iceHandler(through, id) { // ###
   return (e) => {
     if(!getConnection(id).connected) {
       if(e.candidate) {
-        call(through, 'call', id, 'ice', sea.id, e.candidate);
+        sea.call(through, 'call', id, 'ice', sea.id, e.candidate);
       }
     }
   }
 }
 
 // ## General communication structure
-
-function call(dst, type) { // ###
-  let args = slice(arguments, 2);
-  log('call ' + type, dst, type, args, arguments);
-  return new Promise((resolve, reject) => {
-    let id = randomId();
-    sea.incoming.once(id, msg => msg.error ? reject(msg.error) : resolve(msg.data));
-    setTimeout(() => sea.incoming.emit(id, {error: 'timeout'}), timeout);
-    relay({dst, type, reply: sea.id, replyType: id, data: args});
-  });
-}
-
-function exportFn(name, f) { // ###
-  sea.incoming.on(name, async (msg) => {
-    let response = { type: msg.replyType, dst: msg.reply};
-    try {
-      response.data = await f.apply(f, msg.data);
-    } catch(e) {
-      response.error = String(e);
-    }
-    relay(response);
-  });
-}
-
-exportFn('call', call); // ###
+//
 function relay(msg) { // ###
-  //log('relay ' + msg.dst.slice(0,8) + ' ' + msg.type);
   let con = nearestConnection(msg.dst);
   if(hashDist(con.id, msg.dst) < hashDist(sea.id, msg.dst)) {
     con.send(msg)
@@ -949,8 +924,6 @@ function relay(msg) { // ###
     log('dropped', msg.type, msg.dst);
   }
 }
-
-
 function handshake({send, resolve, onMessage, onClose}) { // ###
   send({id: sea.id, peers: getConnections()});
   var id;
