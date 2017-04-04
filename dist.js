@@ -563,11 +563,17 @@ function isUndefined(arg) {
 // - `reply` address to reply to
 // - `replyName` name/mailbox to reply to
 // - `multicast` true if the message should be send to all nodes in the channel
+//
 // 
 // ### Private
 //
-// - `sea.secret` secret/channel-address for this node only. Join to receive messages.
 // - `sea.connections` - list of current connections
+//
+// Connection state:
+//
+// - `connections`: list of current connections
+// - `channels`: list of current channels
+//
 // # Tasks / notes
 //
 // - use designed api
@@ -631,7 +637,7 @@ function isUndefined(arg) {
 let EventEmitter = __webpack_require__(1);
 let {dist, hashAddress} = __webpack_require__(0);
 let sea = new EventEmitter();
-module.exports = sea;
+window.nodesea = module.exports = sea;
 
 // ## Public API
 // 
@@ -687,21 +693,20 @@ sea.call = function call(dst, type) { // ###
   });
 }
 
-
 // ## Private API methods
 
 sea.incoming.exportFn('call', sea.call); // ###
 sea.chans = {};
 // ## Connections
-var connections = sea.connections = [];
+sea.connections = [];
 function getConnections() { // ###
-  return connections
+  return sea.connections
     .filter(o => o.connected)
     .map(o => o.id);
 }
 
 function getConnection(id) { // ###
-  let con = (connections.filter(o => o.id === id)||[])[0];
+  let con = (sea.connections.filter(o => o.id === id)||[])[0];
   if(!con) {
     con = new EventEmitter();
     con.outgoing = [];
@@ -713,16 +718,18 @@ function getConnection(id) { // ###
     con.latency = 65535;
     con.timestamp = Date.now();
     con.peers = [];
-    connections.push(con);
+    sea.connections.push(con);
+    sea.emit('connections');
   }
   return con;
 }
 
 function removeConnection(id) { // ###
-  for(let i = 0; i < connections.length; ++i) {
-    if(connections[i].id === id) {
-      connections[i] = connections[connections.length - 1];
-      connections.pop();
+  for(let i = 0; i < sea.connections.length; ++i) {
+    if(sea.connections[i].id === id) {
+      sea.connections[i] = sea.connections[sea.connections.length - 1];
+      sea.connections.pop();
+      sea.emit('connections');
       return;
     }
   }
@@ -896,12 +903,20 @@ sea.incoming.exportFn('ice', // ###
   });
 function addChanHandler(chan, id) { // ###
   log('chan', chan);
-  chan.onmessage = (e) => log('msg', e.data);
+  let messageHandler = () => {};
+  let closeHandler = () => {};
+  chan.onmessage = (msg) => messageHandler(decode(msg.data));
+  chan.onmessage = o => log('onmessage', o.data);
   chan.onopen = () => {
+    handshake({
+      send: o => chan.send(encode(o)),
+      onMessage: f => messageHandler = f,
+      onClose: f => closeHandler = f,
+    });
     log('chan open', id);
     let con = getConnection(id);
     con.connected = true;
-    setInterval(() => chan.send('hi from ' + sea.id.slice(0, 5)), 1000);
+    //setInterval(() => chan.send('hi from ' + sea.id.slice(0, 5)), 1000);
   }
 }
 function iceHandler(through, id) { // ###
@@ -933,14 +948,27 @@ function handshake({send, resolve, onMessage, onClose}) { // ###
     con.connected = true;
     con.send = send;
     con.peers = msg.peers;
+    sea.emit('connected', id);
     onMessage(msg => sea.id === msg.dst ? sea.incoming.emit(msg.type, msg) : relay(msg));
     if(resolve) resolve();
   });
   onClose(() => {
+    sea.emit('disconnected', id);
     log('disconnect', id);
     removeConnection(id);
   });
 }
+sea.on('connected', (id) => {
+  log('cconnected', id);
+  for(let con of getConnections()) {
+    if(con.id !== id) {
+      console.log('send-ccon', con.id);
+    }
+  }
+});
+sea.incoming.exportFn('connect-state', (id, op, to) => {
+  log('connect', id, op, to);
+});
 
 // ## Main
 
@@ -993,6 +1021,67 @@ async function goOnline() { // ###
   //
 }
 
+// # Connection visualisation
+if(typeof window === 'object' && window.graph) {
+  let svg = document.getElementById('graph');
+
+  console.log('svg', svg);
+
+  let simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; }))
+    .force("charge", d3.forceManyBody())
+    .force("center", d3.forceCenter(300, 200));
+
+  let nodes = [
+    {id:'a', peers: ['b']}, 
+    {id: 'b', peers: ['c', 'd']}, 
+    {id: 'c', peers: []},
+    {id: 'd', peers: ['b', 'c', 'a']}
+  ];
+  function links() {
+    let result = [];
+    for(let i = 0; i < nodes.length; ++i) {
+      let node = nodes[i];
+      for(let j = 0; j < node.peers.length; ++j) {
+        result.push({
+          source: node.id,
+          target: peers[j],
+        });
+      }
+    }
+    return result;
+  }
+
+  simulation.nodes(nodes).on("tick", ticked);
+
+  simulation.force("link").links(links());
+
+  function ticked() {
+    let n = {};
+    for(let i = 0; i < nodes.length; ++i) {
+      n[nodes[i].id] = nodes[i];
+    }
+    let ctx = window.graph.getContext('2d');
+    ctx.clearRect(0,0, 600, 300);
+    for(let i = 0; i < nodes.length; ++i) {
+      let node = nodes[i];
+      ctx.strokeStyle = '#ccc'
+      ctx.beginPath();
+      for(let j = 0; j < node.peers.length; ++j) {
+        ctx.moveTo(node.x, node.y);
+        let dst = n[node.peers[j]];
+        ctx.lineTo(dst.x, dst.y);
+      }
+      ctx.stroke();
+    }
+
+    for(let i = 0; i < nodes.length; ++i) {
+      let node = nodes[i];
+      ctx.fillText(node.id, node.x, node.y );
+    }
+  }
+}
+//
 
 
 /***/ })
